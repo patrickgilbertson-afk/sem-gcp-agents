@@ -28,8 +28,10 @@ This framework automates SEM workflows using specialized AI agents:
 - Python 3.11+
 - GCP project with billing enabled
 - Google Ads API developer token (approved for production)
+- **Portkey account** (REQUIRED - LLM gateway) - [Sign up](https://portkey.ai)
+- Anthropic API key (configured in Portkey)
+- Google AI API key for Gemini (configured in Portkey)
 - Slack workspace with admin access
-- Anthropic API key
 
 ### Installation
 

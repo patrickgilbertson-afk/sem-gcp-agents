@@ -4,8 +4,8 @@ from datetime import date, timedelta
 from typing import Any
 
 from src.config import settings
+from src.core import AnthropicClient  # Uses Portkey routing by default
 from src.core.base_agent import BaseAgent
-from src.core.llm_clients import AnthropicClient
 from src.integrations.bigquery.client import get_client as get_bq_client
 from src.integrations.bigquery.queries import CAMPAIGN_HEALTH_METRICS
 from src.models.base import AgentType

@@ -33,18 +33,19 @@ class Settings(BaseSettings):
     google_ads_customer_id: str
     google_ads_login_customer_id: str
 
-    # Anthropic
-    anthropic_api_key: str
-
-    # Google AI (Gemini)
-    google_ai_api_key: str
-
-    # Portkey (LLM Gateway)
+    # Portkey (LLM Gateway) - REQUIRED for production
+    # All LLM calls route through Portkey
     portkey_api_key: str
     portkey_virtual_key_anthropic: str
     portkey_virtual_key_google: str
     portkey_enable_cache: bool = True
     portkey_cache_ttl: int = 3600
+
+    # Direct API Keys (DEPRECATED - only for local development fallback)
+    # In production, configure these in Portkey dashboard virtual keys
+    # The Portkey clients above do NOT use these keys
+    anthropic_api_key: str | None = None
+    google_ai_api_key: str | None = None
 
     # Slack
     slack_bot_token: str
