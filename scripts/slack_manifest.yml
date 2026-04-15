@@ -1,0 +1,34 @@
+display_information:
+  name: SEM Agents
+  description: AI-powered SEM campaign management
+  background_color: "#2c2d30"
+features:
+  bot_user:
+    display_name: SEM Agents
+    always_online: true
+  slash_commands:
+    - command: /sem-agents
+      url: https://your-cloud-run-url.run.app/api/v1/slack/commands
+      description: Manage SEM agents
+      usage_hint: "status | run <agent_type> | pause | resume | brand"
+oauth_config:
+  scopes:
+    bot:
+      - channels:read
+      - chat:write
+      - chat:write.public
+      - commands
+      - users:read
+      - im:write
+settings:
+  event_subscriptions:
+    request_url: https://your-cloud-run-url.run.app/api/v1/slack/events
+    bot_events:
+      - message.channels
+      - app_mention
+  interactivity:
+    is_enabled: true
+    request_url: https://your-cloud-run-url.run.app/api/v1/slack/interactions
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

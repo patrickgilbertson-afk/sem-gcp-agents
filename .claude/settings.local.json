@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/patrick.gilbertson/SEM-GCP-Agents -type f -name \"*\" 2>/dev/null | head -100)",
+      "WebSearch",
+      "Bash(python --version 2>&1; pip --version 2>&1)",
+      "Bash(terraform --version 2>&1 || echo \"Terraform not installed\")",
+      "Bash(find . -type f -name \"*.py\" -o -name \"*.toml\" -o -name \"*.yml\" -o -name \"*.yaml\" -o -name \"Dockerfile\" -o -name \".env*\" 2>/dev/null | head -20)",
+      "Bash(chmod +x scripts/*.sh)",
+      "Bash(cd \"C:\\\\Users\\\\patrick.gilbertson\\\\SEM-GCP-Agents\" && python -m py_compile src/models/taxonomy.py src/services/taxonomy.py src/utils/taxonomy.py src/core/orchestrator.py scripts/seed_taxonomy.py 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\patrick.gilbertson\\\\SEM-GCP-Agents\" && python -c \"from src.models.taxonomy import CampaignTaxonomy, SyncGroupContext; from src.services.taxonomy import TaxonomyService; from src.utils.taxonomy import parse_campaign_name; print\\('✓ All imports successful'\\)\" 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\patrick.gilbertson\\\\SEM-GCP-Agents\" && python -m py_compile src/models/__init__.py 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\patrick.gilbertson\\\\SEM-GCP-Agents\" && python -m py_compile src/integrations/bigquery/client.py 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\patrick.gilbertson\\\\SEM-GCP-Agents\" && python -m py_compile scripts/seed_taxonomy.py && echo \"✓ All files compile successfully\")",
+      "Bash(cd C:/Users/patrick.gilbertson/SEM-GCP-Agents && mkdir -p docs/architecture docs/guides docs/reference docs/integrations docs/development)",
+      "Bash(cd C:/Users/patrick.gilbertson/SEM-GCP-Agents && mv SYSTEM_OVERVIEW.md docs/architecture/ && mv DEPLOYMENT_GUIDE.md docs/guides/ && mv GETTING_STARTED.md docs/guides/ && mv QUICK_START.md docs/guides/ && mv QUICK_REFERENCE.md docs/reference/ && mv GEMINI_SQL_PROMPTS.md docs/reference/ && mv IMPLEMENTATION_STATUS.md docs/development/ && mv ENHANCEMENTS_SUMMARY.md docs/development/ && mv AGENT_EXCLUSIONS_CHANGES.md docs/development/)",
+      "Bash(cd C:/Users/patrick.gilbertson/SEM-GCP-Agents/docs && mv BIGQUERY_ARCHITECTURE.md architecture/ && mv CAMPAIGN_TAXONOMY_SYSTEM.md architecture/ && mv PORTKEY_INTEGRATION.md integrations/ && mv SETUP_PORTKEY.md integrations/)",
+      "Bash(cd C:/Users/patrick.gilbertson/SEM-GCP-Agents && rm -rf Sonar-SEM-Agents sem-agents scripts/__pycache__)"
+    ]
+  }
+}

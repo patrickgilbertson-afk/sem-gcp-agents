@@ -1,0 +1,113 @@
+steps:
+  # Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-image'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/sem-gcp-agents:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/sem-gcp-agents:latest'
+      - '.'
+
+  # Push Docker image (commit SHA)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-image-sha'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/sem-gcp-agents:$COMMIT_SHA'
+    waitFor: ['build-image']
+
+  # Push Docker image (latest)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-image-latest'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/sem-gcp-agents:latest'
+    waitFor: ['build-image']
+
+  # Terraform Init
+  - name: 'hashicorp/terraform:1.5'
+    id: 'terraform-init'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        cd terraform
+        terraform init
+    waitFor: ['-'] # Run in parallel with image push
+
+  # Terraform Plan
+  - name: 'hashicorp/terraform:1.5'
+    id: 'terraform-plan'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        cd terraform
+        terraform plan \
+          -var="cloud_run_image=gcr.io/$PROJECT_ID/sem-gcp-agents:$COMMIT_SHA" \
+          -var="project_id=$PROJECT_ID" \
+          -var="region=$_REGION"
+    env:
+      - 'TF_VAR_project_id=$PROJECT_ID'
+      - 'TF_VAR_region=$_REGION'
+    waitFor: ['terraform-init', 'push-image-sha']
+
+  # Terraform Apply
+  - name: 'hashicorp/terraform:1.5'
+    id: 'terraform-apply'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        cd terraform
+        terraform apply -auto-approve \
+          -var="cloud_run_image=gcr.io/$PROJECT_ID/sem-gcp-agents:$COMMIT_SHA" \
+          -var="project_id=$PROJECT_ID" \
+          -var="region=$_REGION"
+    env:
+      - 'TF_VAR_project_id=$PROJECT_ID'
+      - 'TF_VAR_region=$_REGION'
+    waitFor: ['terraform-plan']
+
+  # Test deployment
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'test-deployment'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Get service URL
+        SERVICE_URL=$(gcloud run services describe sem-gcp-agents \
+          --region=$_REGION \
+          --format='value(status.url)')
+
+        echo "Service URL: $SERVICE_URL"
+
+        # Wait for service to be ready
+        sleep 10
+
+        # Test health endpoint
+        curl -f "$SERVICE_URL/health" || exit 1
+
+        echo "Health check passed!"
+    waitFor: ['terraform-apply']
+
+# Substitutions (can be overridden in trigger)
+substitutions:
+  _REGION: us-central1
+
+# Build options
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'N1_HIGHCPU_8'
+  substitution_option: 'ALLOW_LOOSE'
+
+# Images to store in Container Registry
+images:
+  - 'gcr.io/$PROJECT_ID/sem-gcp-agents:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/sem-gcp-agents:latest'
+
+# Timeout (max 2 hours)
+timeout: 7200s
