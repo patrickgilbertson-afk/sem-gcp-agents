@@ -623,17 +623,22 @@ CLUSTER BY url_hash;
 
 ### Prerequisites Checklist
 
-- [ ] **Google Cloud Project** created with billing enabled
-- [ ] **APIs Enabled**:
-  - Cloud Run API
-  - BigQuery API
-  - Cloud Scheduler API
-  - Pub/Sub API
-  - Secret Manager API
-  - Cloud Build API
+- [ ] **Google Cloud Project** - existing or new with billing enabled
+- [ ] **gcloud CLI** installed and authenticated
+- [ ] **APIs Enabled** (check with `gcloud services list --enabled`):
+  - Cloud Run API (`run.googleapis.com`)
+  - BigQuery API (`bigquery.googleapis.com`)
+  - Cloud Scheduler API (`cloudscheduler.googleapis.com`)
+  - Pub/Sub API (`pubsub.googleapis.com`)
+  - Secret Manager API (`secretmanager.googleapis.com`)
+  - Cloud Build API (`cloudbuild.googleapis.com`)
 - [ ] **Google Ads Account** with API access enabled
 - [ ] **Anthropic API Key** (Claude Sonnet 4.5)
-- [ ] **Google Cloud AI API** enabled (for Gemini)
+- [ ] **Google Cloud AI API** key (for Gemini)
+- [ ] **Portkey Account** (REQUIRED - LLM gateway) - [Setup Guide](../integrations/PORTKEY_INTEGRATION.md)
+  - Portkey API key
+  - Anthropic virtual key
+  - Google virtual key
 - [ ] **Slack Workspace** with admin access
 - [ ] **Service Account** with permissions:
   - BigQuery Admin
@@ -641,6 +646,90 @@ CLUSTER BY url_hash;
   - Secret Manager Admin
   - Pub/Sub Admin
   - Service Account User
+
+---
+
+### Step 0: Configure GCP Project
+
+**Choose ONE path:** Use an existing project or create a new one.
+
+#### Option A: Use Existing Project (Recommended)
+
+```bash
+# List your projects
+gcloud projects list
+
+# Set your existing project
+export PROJECT_ID="your-existing-project-id"
+export REGION="us-central1"
+
+# Set as active
+gcloud config set project $PROJECT_ID
+
+# Verify billing is enabled
+gcloud billing projects describe $PROJECT_ID --format="value(billingEnabled)"
+# Should return: True
+
+# Check which APIs are already enabled
+gcloud services list --enabled
+
+# Enable any missing APIs (safe to run even if already enabled)
+gcloud services enable \
+    run.googleapis.com \
+    cloudbuild.googleapis.com \
+    bigquery.googleapis.com \
+    pubsub.googleapis.com \
+    secretmanager.googleapis.com \
+    cloudscheduler.googleapis.com \
+    iam.googleapis.com
+
+# Check for existing service accounts
+gcloud iam service-accounts list
+```
+
+#### Option B: Create New Project
+
+```bash
+# Set project ID (must be globally unique)
+export PROJECT_ID="sem-gcp-agents-prod"
+export REGION="us-central1"
+
+# Create project
+gcloud projects create $PROJECT_ID --name="SEM GCP Agents"
+
+# Set as active
+gcloud config set project $PROJECT_ID
+
+# Find your billing account
+gcloud billing accounts list
+
+# Link billing (replace BILLING_ACCOUNT_ID)
+gcloud billing projects link $PROJECT_ID --billing-account=BILLING_ACCOUNT_ID
+
+# Enable all required APIs
+gcloud services enable \
+    run.googleapis.com \
+    cloudbuild.googleapis.com \
+    bigquery.googleapis.com \
+    pubsub.googleapis.com \
+    secretmanager.googleapis.com \
+    cloudscheduler.googleapis.com \
+    iam.googleapis.com
+```
+
+#### Authenticate gcloud CLI
+
+```bash
+# Login to GCP
+gcloud auth login
+
+# Set application default credentials (for local development)
+gcloud auth application-default login
+
+# Verify setup
+gcloud config list
+gcloud auth list
+```
 
 ---
 
@@ -659,35 +748,60 @@ CLUSTER BY url_hash;
 6. Wait 24-48 hours for initial backfill
 
 #### 1.2 Create Agent Datasets & Tables
+
+**Check for existing datasets first:**
+```bash
+# List existing BigQuery datasets
+bq ls
+
+# Check if sem_agents dataset exists
+bq ls sem_agents 2>/dev/null && echo "Dataset exists" || echo "Dataset does not exist"
+```
+
+**Option A: Use Terraform (Recommended)**
 ```bash
 cd terraform/modules/bigquery
 terraform init
-terraform plan -var="project_id=YOUR_PROJECT_ID"
-terraform apply
+terraform plan -var="project_id=$PROJECT_ID"
+
+# Review what will be created
+# If datasets/tables exist, Terraform will show what will be imported/updated
+
+terraform apply -var="project_id=$PROJECT_ID"
+```
+
+**Option B: Manual Creation**
+```bash
+# Create dataset (skip if exists)
+bq mk --dataset --location=US $PROJECT_ID:sem_agents 2>/dev/null || echo "Dataset already exists"
+
+# Run SQL schema files
+# First, check which tables already exist
+bq ls sem_agents
+
+# Then create missing tables (safe to run, will error if table exists)
+bq query --use_legacy_sql=false < sql/schema/01_agent_config.sql 2>/dev/null
+bq query --use_legacy_sql=false < sql/schema/02_agent_recommendations.sql 2>/dev/null
+# ... (repeat for all 12 tables)
 ```
 
 This creates:
 - Dataset: `sem_agents`
-- All 12 tables listed above
+- All 12 tables (see schema section above)
 - Views for common queries (e.g., `v_active_campaigns`, `v_low_qs_keywords`)
-
-**Manual Alternative** (if not using Terraform):
-```bash
-# Run SQL scripts in order
-bq mk --dataset --location=US YOUR_PROJECT_ID:sem_agents
-bq query < sql/schema/01_agent_config.sql
-bq query < sql/schema/02_agent_recommendations.sql
-# ... (repeat for all 12 tables)
-```
 
 #### 1.3 Verify Data
 ```bash
 # Check that Google Ads data is flowing
-bq ls google_ads_raw
-bq head -n 10 google_ads_raw.p_ads_Campaign_CUSTOMER_ID
+bq ls google_ads_raw 2>/dev/null && echo "Google Ads dataset exists" || echo "Need to set up Data Transfer"
+bq head -n 10 google_ads_raw.p_ads_Campaign_$CUSTOMER_ID 2>/dev/null
 
 # Check agent tables exist
 bq ls sem_agents
+
+# Verify table schemas
+bq show sem_agents.agent_config
+bq show sem_agents.agent_recommendations
 ```
 
 ---
@@ -695,35 +809,76 @@ bq ls sem_agents
 ### Step 2: Configure Secrets
 
 #### 2.1 Create Secrets in Secret Manager
+
+**First, check existing secrets:**
 ```bash
-# Google Ads credentials
-echo '{"developer_token": "YOUR_TOKEN", "client_id": "...", "client_secret": "...", "refresh_token": "..."}' | \
-  gcloud secrets create google-ads-credentials --data-file=-
+# List all secrets
+gcloud secrets list
 
-# Anthropic API key
-echo "sk-ant-..." | gcloud secrets create anthropic-api-key --data-file=-
-
-# Slack bot token
-echo "xoxb-..." | gcloud secrets create slack-bot-token --data-file=-
-
-# Slack signing secret
-echo "..." | gcloud secrets create slack-signing-secret --data-file=-
+# Check if specific secrets exist
+gcloud secrets describe anthropic-api-key 2>/dev/null && echo "Exists" || echo "Does not exist"
 ```
 
-**Or use Terraform**:
+**Create or update secrets:**
+```bash
+# Function to create or update secret
+create_or_update_secret() {
+    local secret_name=$1
+    local secret_value=$2
+
+    if gcloud secrets describe $secret_name &>/dev/null; then
+        echo "Updating existing secret: $secret_name"
+        echo -n "$secret_value" | gcloud secrets versions add $secret_name --data-file=-
+    else
+        echo "Creating new secret: $secret_name"
+        echo -n "$secret_value" | gcloud secrets create $secret_name --data-file=-
+    fi
+}
+
+# Google Ads credentials (JSON format)
+create_or_update_secret "google-ads-credentials" '{"developer_token": "YOUR_TOKEN", "client_id": "...", "client_secret": "...", "refresh_token": "..."}'
+
+# Anthropic API key
+create_or_update_secret "anthropic-api-key" "sk-ant-..."
+
+# Slack bot token
+create_or_update_secret "slack-bot-token" "xoxb-..."
+
+# Slack signing secret
+create_or_update_secret "slack-signing-secret" "YOUR_SIGNING_SECRET"
+```
+
+**Or use Terraform (handles create/update automatically):**
 ```bash
 cd terraform/modules/secrets
+terraform init
 terraform apply -var="google_ads_creds_json=..." -var="anthropic_key=..."
 ```
 
 #### 2.2 Grant Service Account Access
-```bash
-SERVICE_ACCOUNT="sem-agents@YOUR_PROJECT_ID.iam.gserviceaccount.com"
 
+```bash
+# Set service account (will be created by Terraform, or create manually)
+SERVICE_ACCOUNT="sem-agents@$PROJECT_ID.iam.gserviceaccount.com"
+
+# Check if service account exists
+gcloud iam service-accounts describe $SERVICE_ACCOUNT 2>/dev/null || \
+  gcloud iam service-accounts create sem-agents --display-name="SEM Agents Runtime"
+
+# Grant access to secrets (safe to run multiple times)
 for secret in google-ads-credentials anthropic-api-key slack-bot-token slack-signing-secret; do
+  echo "Granting $SERVICE_ACCOUNT access to $secret..."
   gcloud secrets add-iam-policy-binding $secret \
     --member="serviceAccount:$SERVICE_ACCOUNT" \
-    --role="roles/secretmanager.secretAccessor"
+    --role="roles/secretmanager.secretAccessor" \
+    2>/dev/null || echo "  (already granted)"
+done
+
+# Verify permissions
+echo -e "\nVerifying secret access..."
+for secret in google-ads-credentials anthropic-api-key slack-bot-token slack-signing-secret; do
+  echo "Checking $secret:"
+  gcloud secrets get-iam-policy $secret --filter="bindings.members:$SERVICE_ACCOUNT" --format="value(bindings.role)"
 done
 ```
 

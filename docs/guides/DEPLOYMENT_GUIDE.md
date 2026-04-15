@@ -94,7 +94,32 @@ git push -u origin main
 
 ## GCP Setup
 
-### 1. Create GCP Project
+### 1. Set Up GCP Project
+
+Choose **ONE** of the following paths:
+
+#### Option A: Use Existing Project (Recommended if you already have a project)
+
+```bash
+# List your existing projects
+gcloud projects list
+
+# Set your existing project ID
+export PROJECT_ID="your-existing-project-id"
+export REGION="us-central1"
+
+# Set as active project
+gcloud config set project $PROJECT_ID
+
+# Verify billing is enabled
+gcloud billing projects describe $PROJECT_ID --format="value(billingEnabled)"
+# Should output: True
+
+# If billing is not enabled, link billing account
+# gcloud billing projects link $PROJECT_ID --billing-account=BILLING_ACCOUNT_ID
+```
+
+#### Option B: Create New GCP Project
 
 ```bash
 # Set your project ID (must be globally unique)
@@ -107,14 +132,18 @@ gcloud projects create $PROJECT_ID --name="SEM GCP Agents"
 # Set as active project
 gcloud config set project $PROJECT_ID
 
-# Link billing account (replace BILLING_ACCOUNT_ID)
+# Link billing account (replace BILLING_ACCOUNT_ID with yours)
+# Find your billing account: gcloud billing accounts list
 gcloud billing projects link $PROJECT_ID --billing-account=BILLING_ACCOUNT_ID
 ```
 
 ### 2. Enable Required APIs
 
 ```bash
-# Enable APIs
+# Check which APIs are already enabled (optional)
+gcloud services list --enabled
+
+# Enable all required APIs (safe to run even if some are already enabled)
 gcloud services enable \
     run.googleapis.com \
     cloudbuild.googleapis.com \
@@ -126,17 +155,24 @@ gcloud services enable \
     cloudscheduler.googleapis.com \
     iam.googleapis.com \
     googleads.googleapis.com
+
+# Verify all APIs are enabled
+gcloud services list --enabled --filter="name:(run.googleapis.com OR bigquery.googleapis.com OR secretmanager.googleapis.com)"
 ```
 
 ### 3. Create Service Account for Deployment
 
 ```bash
-# Create service account
+# Check if service account already exists
+gcloud iam service-accounts list --filter="email:sem-agents-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
+
+# If not exists, create it
 gcloud iam service-accounts create sem-agents-deployer \
     --display-name="SEM Agents Deployer" \
-    --description="Service account for deploying SEM GCP Agents"
+    --description="Service account for deploying SEM GCP Agents" \
+    2>/dev/null || echo "Service account already exists, skipping creation"
 
-# Grant necessary roles
+# Grant necessary roles (safe to run even if already granted)
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:sem-agents-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
     --role="roles/editor"
@@ -144,6 +180,12 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:sem-agents-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
     --role="roles/iam.serviceAccountUser"
+
+# Verify roles were granted
+gcloud projects get-iam-policy $PROJECT_ID \
+    --flatten="bindings[].members" \
+    --filter="bindings.members:sem-agents-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --format="table(bindings.role)"
 ```
 
 ### 4. Configure Authentication for Local Development
@@ -425,21 +467,48 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 ### 1. Configure Secrets in GCP Secret Manager
 
 ```bash
-# Create secrets (replace with actual values)
-echo -n "YOUR_ANTHROPIC_API_KEY" | gcloud secrets create anthropic-api-key --data-file=-
-echo -n "YOUR_GOOGLE_ADS_DEVELOPER_TOKEN" | gcloud secrets create google-ads-developer-token --data-file=-
-echo -n "YOUR_GOOGLE_ADS_CLIENT_ID" | gcloud secrets create google-ads-client-id --data-file=-
-echo -n "YOUR_GOOGLE_ADS_CLIENT_SECRET" | gcloud secrets create google-ads-client-secret --data-file=-
-echo -n "YOUR_GOOGLE_ADS_REFRESH_TOKEN" | gcloud secrets create google-ads-refresh-token --data-file=-
-echo -n "YOUR_SLACK_BOT_TOKEN" | gcloud secrets create slack-bot-token --data-file=-
-echo -n "YOUR_SLACK_SIGNING_SECRET" | gcloud secrets create slack-signing-secret --data-file=-
+# Check existing secrets
+echo "Checking for existing secrets..."
+gcloud secrets list
 
-# Grant access to Cloud Run service account
+# Function to create or update secret
+create_or_update_secret() {
+    SECRET_NAME=$1
+    SECRET_VALUE=$2
+
+    if gcloud secrets describe $SECRET_NAME &>/dev/null; then
+        echo "Secret $SECRET_NAME exists. Updating..."
+        echo -n "$SECRET_VALUE" | gcloud secrets versions add $SECRET_NAME --data-file=-
+    else
+        echo "Creating secret $SECRET_NAME..."
+        echo -n "$SECRET_VALUE" | gcloud secrets create $SECRET_NAME --data-file=-
+    fi
+}
+
+# Create or update secrets (replace with actual values)
+create_or_update_secret "anthropic-api-key" "YOUR_ANTHROPIC_API_KEY"
+create_or_update_secret "google-ads-developer-token" "YOUR_GOOGLE_ADS_DEVELOPER_TOKEN"
+create_or_update_secret "google-ads-client-id" "YOUR_GOOGLE_ADS_CLIENT_ID"
+create_or_update_secret "google-ads-client-secret" "YOUR_GOOGLE_ADS_CLIENT_SECRET"
+create_or_update_secret "google-ads-refresh-token" "YOUR_GOOGLE_ADS_REFRESH_TOKEN"
+create_or_update_secret "slack-bot-token" "YOUR_SLACK_BOT_TOKEN"
+create_or_update_secret "slack-signing-secret" "YOUR_SLACK_SIGNING_SECRET"
+
+# Alternative: Create all at once (will fail if secrets exist)
+# echo -n "YOUR_ANTHROPIC_API_KEY" | gcloud secrets create anthropic-api-key --data-file=- 2>/dev/null || echo "anthropic-api-key already exists"
+# ... repeat for each secret
+
+# Grant access to Cloud Run service account (safe to run multiple times)
 for SECRET in anthropic-api-key google-ads-developer-token google-ads-client-id google-ads-client-secret google-ads-refresh-token slack-bot-token slack-signing-secret; do
     gcloud secrets add-iam-policy-binding $SECRET \
         --member="serviceAccount:sem-agents-runtime@${PROJECT_ID}.iam.gserviceaccount.com" \
-        --role="roles/secretmanager.secretAccessor"
+        --role="roles/secretmanager.secretAccessor" \
+        2>/dev/null || echo "Permission already granted for $SECRET"
 done
+
+# Verify secrets and permissions
+echo -e "\nVerifying secrets..."
+gcloud secrets list --filter="name:(anthropic-api-key OR slack-bot-token)"
 ```
 
 ### 2. Configure Terraform Variables
