@@ -15,10 +15,10 @@ class CampaignMetrics(BaseModel):
     conversions: float
     conversion_value: float
 
-    # Calculated
-    ctr: float  # Click-through rate
-    avg_cpc: float  # Average cost per click
-    conversion_rate: float  # Conversions / clicks
+    # Calculated (can be NULL if no clicks/conversions)
+    ctr: float | None = None  # Click-through rate
+    avg_cpc: float | None = None  # Average cost per click
+    conversion_rate: float | None = None  # Conversions / clicks
     cost_per_conversion: float | None = None
     roas: float | None = None  # Return on ad spend
 
