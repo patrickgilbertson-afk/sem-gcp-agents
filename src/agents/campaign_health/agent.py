@@ -37,11 +37,11 @@ class CampaignHealthAgent(BaseAgent):
         end_date = date.today()
         start_date = end_date - timedelta(days=30)
 
-        # Format query
+        # Format query with customer ID as suffix (views don't support wildcards)
         query = CAMPAIGN_HEALTH_METRICS.format(
             project_id=settings.gcp_project_id,
             dataset=settings.bq_dataset_raw,
-            date_suffix="*",  # Use wildcard for table suffix
+            date_suffix=settings.google_ads_customer_id,
         )
 
         # Execute query
