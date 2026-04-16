@@ -3,7 +3,7 @@
 from datetime import date
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CampaignMetrics(BaseModel):
@@ -57,6 +57,14 @@ class CampaignHealthData(BaseModel):
 
     # Additional context
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("campaign_id", "ad_group_id", mode="before")
+    @classmethod
+    def convert_ids_to_string(cls, v: Any) -> str | None:
+        """Convert integer IDs to strings."""
+        if v is None:
+            return None
+        return str(v)
 
     @property
     def health_flags(self) -> list[str]:
