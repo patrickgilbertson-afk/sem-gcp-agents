@@ -24,16 +24,29 @@ This framework automates SEM workflows using specialized AI agents:
 
 ## Setup
 
+### Deployment Options
+
+**🌐 Cloud Shell (Recommended)** ⭐
+- No local setup required
+- Pre-authenticated gcloud
+- Browser-based deployment
+- 📖 **[Complete Cloud Shell Guide](docs/guides/CLOUD_SHELL_SETUP.md)**
+
+**💻 Local Development**
+- Full local environment
+- Continue with prerequisites below
+
 ### Prerequisites
 - Python 3.11+
 - GCP project with billing enabled
+- gcloud CLI (or use Cloud Shell)
 - Google Ads API developer token (approved for production)
 - **Portkey account** (REQUIRED - LLM gateway) - [Sign up](https://portkey.ai)
 - Anthropic API key (configured in Portkey)
 - Google AI API key for Gemini (configured in Portkey)
 - Slack workspace with admin access
 
-### Installation
+### Local Installation
 
 1. Clone repository and create virtual environment:
 ```bash

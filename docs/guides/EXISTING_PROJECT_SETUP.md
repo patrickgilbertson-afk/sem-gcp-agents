@@ -2,10 +2,23 @@
 
 This guide is for users who already have a GCP project and want to deploy the SEM GCP Agents framework without creating a new project.
 
+## Choose Your Deployment Environment
+
+**🌐 Cloud Shell (Recommended - No Local Setup)** ⭐
+- Complete guide: **[Cloud Shell Setup Guide](CLOUD_SHELL_SETUP.md)**
+- Pre-authenticated, no gcloud installation needed
+- Browser-based terminal with all tools pre-installed
+
+**💻 Local CLI**
+- Continue with this guide
+- Requires gcloud CLI installed locally
+
+---
+
 ## Quick Start Checklist
 
 - [ ] Existing GCP project with billing enabled
-- [ ] gcloud CLI installed and authenticated
+- [ ] gcloud CLI - Cloud Shell OR local installation
 - [ ] Project ID and region defined
 - [ ] Required APIs enabled (or will enable during setup)
 - [ ] Access to create service accounts and resources

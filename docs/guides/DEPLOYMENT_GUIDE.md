@@ -18,7 +18,18 @@ This guide walks you through publishing the SEM GCP Agents project to GitHub and
 
 ## Prerequisites
 
-### Required Software
+### Choose Your Environment
+
+**Option 1: Google Cloud Shell (Recommended for Quick Start)** ⭐
+- ✅ No local installation required
+- ✅ Pre-configured with gcloud, terraform, docker, git
+- ✅ Pre-authenticated with your Google account
+- ✅ 5GB persistent storage
+- 📖 **[Complete Cloud Shell Guide](CLOUD_SHELL_SETUP.md)**
+
+**Option 2: Local Development Environment**
+
+### Required Software (Local Only)
 - **Git**: Version 2.30 or later
 - **gcloud CLI**: [Install Google Cloud SDK](https://cloud.google.com/sdk/docs/install)
 - **Terraform**: Version 1.5 or later ([Download](https://www.terraform.io/downloads))

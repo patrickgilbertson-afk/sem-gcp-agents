@@ -16,8 +16,9 @@ Step-by-step guides for users and operators.
 
 - **[Getting Started](guides/GETTING_STARTED.md)** - Introduction and first steps
 - **[Quick Start](guides/QUICK_START.md)** - Fast setup for development
+- **[Cloud Shell Setup](guides/CLOUD_SHELL_SETUP.md)** - Deploy using Google Cloud Shell (⭐ Recommended)
 - **[Deployment Guide](guides/DEPLOYMENT_GUIDE.md)** - Production deployment instructions
-- **[Existing Project Setup](guides/EXISTING_PROJECT_SETUP.md)** - Deploy to an existing GCP project (NEW)
+- **[Existing Project Setup](guides/EXISTING_PROJECT_SETUP.md)** - Deploy to an existing GCP project
 
 ### 📋 Reference
 Technical reference materials and cheat sheets.

@@ -621,10 +621,25 @@ CLUSTER BY url_hash;
 
 ## Next Steps: Deployment to GCP
 
+### Choose Your Deployment Method
+
+**Option 1: Cloud Shell (Recommended for Quick Start)**
+- ✅ No local setup required
+- ✅ Pre-authenticated gcloud
+- ✅ Browser-based terminal
+- 📖 [Cloud Shell Setup Guide](../guides/CLOUD_SHELL_SETUP.md)
+
+**Option 2: Local CLI**
+- For heavy development work
+- Requires local gcloud installation
+- Follow instructions below
+
+---
+
 ### Prerequisites Checklist
 
 - [ ] **Google Cloud Project** - existing or new with billing enabled
-- [ ] **gcloud CLI** installed and authenticated
+- [ ] **gcloud CLI** - Cloud Shell (pre-installed) OR local installation
 - [ ] **APIs Enabled** (check with `gcloud services list --enabled`):
   - Cloud Run API (`run.googleapis.com`)
   - BigQuery API (`bigquery.googleapis.com`)
