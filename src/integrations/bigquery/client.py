@@ -1,5 +1,6 @@
 """BigQuery client for reading and writing agent data."""
 
+import json
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -168,7 +169,7 @@ async def log_audit_event(
         "agent_type": agent_type.value,
         "event_type": event_type.value,
         "timestamp": datetime.utcnow().isoformat(),
-        "details": str(details),  # Store as JSON string
+        "details": json.dumps(details),  # Store as proper JSON string
     }
 
     await client.insert_rows("agent_audit_log", [row])
