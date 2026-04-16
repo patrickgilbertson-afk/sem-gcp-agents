@@ -50,7 +50,7 @@ class CampaignHealthAgent(BaseAgent):
             params={
                 "start_date": start_date.isoformat(),
                 "end_date": end_date.isoformat(),
-                "customer_id": settings.google_ads_customer_id,
+                "customer_id": int(settings.google_ads_customer_id),
             },
         )
 
