@@ -1,64 +1,65 @@
+# ============================================================================
+# SEM GCP Agents - Terraform Variables
+# ============================================================================
+# Copy this file to terraform.tfvars and fill in your values
+# cp terraform.tfvars.example terraform.tfvars
+
+# ============================================================================
+# REQUIRED VARIABLES
+# ============================================================================
+
 # GCP Project Configuration
-project_id = "sem-gcp-agents-prod"  # TODO: Replace with your GCP project ID
-region     = "us-central1"          # GCP region for resources
+project_id = "your-project-id"  # TODO: Replace with your GCP project ID
+region     = "us-central1"       # GCP region for resources
 
 # Google Ads Configuration
-google_ads_customer_id       = "1234567890"   # TODO: Replace with your Google Ads customer ID (no dashes)
-google_ads_login_customer_id = "9876543210"   # TODO: Replace with your MCC ID (if using MCC account)
-
-# BigQuery Configuration
-bigquery_dataset_id = "sem_agents"  # Dataset for all agent tables
-bigquery_location   = "US"          # BigQuery data location (US, EU, etc.)
-
-# Cloud Run Configuration
-cloud_run_image         = "gcr.io/sem-gcp-agents-prod/sem-gcp-agents:latest"  # Docker image URL
-cloud_run_min_instances = 0                                                     # Min instances (0 = scale to zero)
-cloud_run_max_instances = 10                                                    # Max instances for scaling
-cloud_run_cpu           = "1"                                                   # CPU per instance (1 = 1 vCPU)
-cloud_run_memory        = "512Mi"                                               # Memory per instance
+google_ads_customer_id = "1234567890"  # TODO: Replace with your Google Ads customer ID (no dashes)
 
 # Slack Configuration
-slack_approval_channel_id = "C01234567"  # TODO: Replace with your Slack channel ID for approvals
+slack_approval_channel_id = "C01234567"  # TODO: Replace with your Slack channel ID
+                                          # Get from Slack: Right-click channel → View channel details → Copy channel ID
 
-# Agent Scheduling
-# Cron expressions in UTC (adjust for your timezone)
-campaign_health_schedule = "0 7 * * *"   # Daily at 7 AM UTC
-keyword_schedule         = "0 8 * * *"   # Daily at 8 AM UTC
-quality_score_schedule   = "0 9 * * *"   # Daily at 9 AM UTC
-landing_page_schedule    = "0 10 * * 2"  # Weekly Tuesday at 10 AM UTC
-bid_modifier_schedule    = "0 9 * * 1"   # Weekly Monday at 9 AM UTC
+# ============================================================================
+# SAFETY SETTINGS
+# ============================================================================
 
-# Safety Settings
-dry_run_mode        = true   # TODO: Set to true for initial testing, false for production
-kill_switch_enabled = false  # Emergency stop for all agents
+# Dry Run Mode (RECOMMENDED: Start with true)
+dry_run_mode = true  # true = Generate recommendations but don't apply changes
+                     # false = Apply changes to Google Ads (PRODUCTION MODE)
 
-# Operation Limits (Safety Guardrails)
-max_operations_per_run     = 10000  # Max Google Ads API operations per agent run
-max_daily_budget_increase  = 0.15   # Max 15% daily budget increase
-max_bid_modifier_change    = 0.30   # Max ±30pp bid modifier change per week
+# ============================================================================
+# OPTIONAL VARIABLES (with defaults)
+# ============================================================================
 
-# LLM Configuration
-anthropic_model_campaign_health = "claude-sonnet-4-5"  # Model for Campaign Health Agent
-anthropic_model_keyword         = "claude-sonnet-4-5"  # Model for Keyword Agent
-anthropic_model_quality_score   = "claude-sonnet-4-5"  # Model for Quality Score Agent
-gemini_model_ad_copy            = "gemini-1.5-flash"   # Model for Ad Copy generation
-gemini_model_bid_modifier       = "gemini-1.5-pro"     # Model for Bid Modifier Agent
+# Google Ads MCC Account (optional)
+# google_ads_login_customer_id = "9876543210"  # Uncomment if using MCC account
 
-# Logging and Monitoring
-log_level = "INFO"  # DEBUG, INFO, WARNING, ERROR
-enable_cloud_monitoring = true
-enable_error_reporting  = true
+# Kill Switch (emergency stop)
+# kill_switch_enabled = false  # Set to true to force all agents into dry run
 
-# Approval Settings
-approval_timeout_hours    = 8   # Auto-reject after 8 hours
-escalation_timeout_hours  = 4   # Escalate to manager after 4 hours
-slack_approval_emoji_approve = ":white_check_mark:"
-slack_approval_emoji_reject  = ":x:"
+# Environment
+# environment = "development"  # development, staging, production
 
-# Tags (for resource organization and billing)
-tags = {
-  environment = "production"
-  team        = "sem"
-  managed_by  = "terraform"
-  project     = "sem-gcp-agents"
-}
+# Logging
+# log_level = "INFO"  # DEBUG, INFO, WARNING, ERROR
+
+# BigQuery Datasets
+# dataset_agents = "sem_agents"      # Dataset for agent tables
+# dataset_raw    = "sem_ads_raw"     # Dataset for Google Ads data
+
+# Cloud Run Service
+# service_name = "sem-gcp-agents"           # Cloud Run service name
+# cloud_run_image = "gcr.io/PROJECT_ID/sem-gcp-agents:latest"  # Docker image
+
+# ============================================================================
+# MINIMAL EXAMPLE (Quick Start)
+# ============================================================================
+# Just set these 4 required variables to get started:
+#
+# project_id                = "my-gcp-project"
+# region                    = "us-central1"
+# google_ads_customer_id    = "1234567890"
+# slack_approval_channel_id = "C01234567"
+# dry_run_mode              = true
+#
+# ============================================================================

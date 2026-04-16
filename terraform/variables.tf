@@ -91,3 +91,46 @@ variable "scheduler_jobs" {
     }
   }
 }
+
+# Google Ads Configuration
+variable "google_ads_customer_id" {
+  description = "Google Ads customer ID (without dashes)"
+  type        = string
+}
+
+variable "google_ads_login_customer_id" {
+  description = "Google Ads MCC/login customer ID (optional, for MCC accounts)"
+  type        = string
+  default     = ""
+}
+
+# Slack Configuration
+variable "slack_approval_channel_id" {
+  description = "Slack channel ID for approval requests (e.g., C01234567)"
+  type        = string
+}
+
+# Application Settings
+variable "dry_run_mode" {
+  description = "Enable dry run mode (no changes applied)"
+  type        = bool
+  default     = true
+}
+
+variable "kill_switch_enabled" {
+  description = "Enable kill switch (forces dry run)"
+  type        = bool
+  default     = false
+}
+
+variable "log_level" {
+  description = "Logging level"
+  type        = string
+  default     = "INFO"
+}
+
+variable "environment" {
+  description = "Environment name (development, staging, production)"
+  type        = string
+  default     = "development"
+}
