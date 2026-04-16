@@ -29,4 +29,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:8080/health')"
 
 # Run application
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Use shell form to allow PORT environment variable substitution
+CMD uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8080}
