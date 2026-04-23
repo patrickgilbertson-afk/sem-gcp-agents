@@ -61,6 +61,16 @@ resource "google_bigquery_table" "agent_recommendations" {
       mode = "NULLABLE"
     },
     {
+      name = "impact_estimate"
+      type = "STRING"
+      mode = "NULLABLE"
+    },
+    {
+      name = "risk_level"
+      type = "STRING"
+      mode = "NULLABLE"
+    },
+    {
       name = "action_type"
       type = "STRING"
       mode = "REQUIRED"
@@ -86,8 +96,28 @@ resource "google_bigquery_table" "agent_recommendations" {
       mode = "NULLABLE"
     },
     {
+      name = "approved_at"
+      type = "TIMESTAMP"
+      mode = "NULLABLE"
+    },
+    {
       name = "applied_at"
       type = "TIMESTAMP"
+      mode = "NULLABLE"
+    },
+    {
+      name = "applied_result"
+      type = "JSON"
+      mode = "NULLABLE"
+    },
+    {
+      name = "error_message"
+      type = "STRING"
+      mode = "NULLABLE"
+    },
+    {
+      name = "metadata"
+      type = "JSON"
       mode = "NULLABLE"
     }
   ])
