@@ -62,10 +62,6 @@ class BaseAgent(ABC):
 
             # Step 3: Generate recommendations
             recommendations = await self.generate_recommendations(data, analysis)
-            await self._log_event(
-                EventType.RECOMMEND,
-                {"recommendation_count": len(recommendations)},
-            )
 
             # Create batch
             batch = RecommendationBatch(
@@ -73,6 +69,13 @@ class BaseAgent(ABC):
                 agent_type=self.agent_type,
                 recommendations=recommendations,
                 summary=await self._create_summary(recommendations),
+            )
+
+            # Save recommendations to BigQuery
+            await self._save_recommendations(recommendations)
+            await self._log_event(
+                EventType.RECOMMEND,
+                {"recommendation_count": len(recommendations), "saved_to_bigquery": True},
             )
 
             # Step 4: Request approval (if not in dry run)
@@ -210,6 +213,56 @@ class BaseAgent(ABC):
             recommendation: Recommendation to apply
         """
         pass
+
+    async def _save_recommendations(self, recommendations: list[Recommendation]) -> None:
+        """Save recommendations to BigQuery.
+
+        Args:
+            recommendations: List of recommendations to save
+        """
+        if not recommendations:
+            self.logger.info("no_recommendations_to_save")
+            return
+
+        # Import here to avoid circular dependency
+        from src.integrations.bigquery.client import get_client
+        import json
+
+        bq_client = get_client()
+
+        # Convert recommendations to BigQuery rows
+        rows = []
+        for rec in recommendations:
+            row = {
+                "id": str(rec.id),
+                "agent_type": rec.agent_type.value,
+                "run_id": str(rec.run_id),
+                "created_at": rec.created_at.isoformat(),
+                "title": rec.title,
+                "description": rec.description,
+                "rationale": rec.rationale,
+                "impact_estimate": rec.impact_estimate,
+                "risk_level": rec.risk_level,
+                "action_type": rec.action_type,
+                "action_params": json.dumps(rec.action_params),
+                "status": rec.status.value,
+                "approval_status": rec.approval_status.value if rec.approval_status else None,
+                "approved_by": rec.approved_by,
+                "approved_at": rec.approved_at.isoformat() if rec.approved_at else None,
+                "applied_at": rec.applied_at.isoformat() if rec.applied_at else None,
+                "applied_result": json.dumps(rec.applied_result) if rec.applied_result else None,
+                "error_message": rec.error_message,
+                "metadata": json.dumps(rec.metadata),
+            }
+            rows.append(row)
+
+        try:
+            await bq_client.insert_rows("agent_recommendations", rows)
+            self.logger.info("recommendations_saved", count=len(rows))
+        except Exception as e:
+            self.logger.error("save_recommendations_failed", error=str(e))
+            # Don't raise - we don't want to fail the agent run if saving fails
+            # The recommendations are still returned and can be viewed in logs
 
     async def _log_event(
         self,
