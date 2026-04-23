@@ -12,6 +12,44 @@ An AI-powered SEM campaign management framework that automates campaign optimiza
 
 ---
 
+## Implementation Status
+
+**Document Version**: 1.1 (Updated 2026-04-23)
+
+**Current Deployment**:
+- **Project ID**: `sem-gcp-agents-prod`
+- **Service URL**: `https://sem-gcp-agents-<hash>-uc.a.run.app`
+- **Region**: `us-central1`
+
+**Phase Status**:
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| **Phase 1** | ✅ **COMPLETE** | Foundation + Campaign Health Agent deployed and running |
+| **Phase 2.5** | 🚧 **IN PROGRESS** | Campaign Taxonomy + Quality Score + Landing Page agents |
+| **Phase 3** | 📋 **PLANNED** | Keyword Agent |
+| **Phase 4** | 📋 **PLANNED** | Ad Copy Agent |
+| **Phase 5** | 📋 **PLANNED** | Bid Modifier Agent |
+
+**Phase 1 Accomplishments** (Deployed):
+- ✅ Core infrastructure (BigQuery, Cloud Run, Pub/Sub, Secrets, IAM)
+- ✅ Base agent framework and orchestrator
+- ✅ LLM clients (Claude via Portkey, Gemini via Portkey)
+- ✅ Campaign Health Agent (generates ~5,900 recommendations per run)
+- ✅ Slack approval workflow (interactive buttons for approve/reject)
+- ✅ Terraform IaC for all components
+- ✅ CI/CD pipeline via Cloud Build
+- ✅ Audit logging and LLM call tracking
+
+**Phase 2.5 In Progress** (Partial deployment):
+- 🚧 Campaign taxonomy detection and sync group management
+- 🚧 Quality Score history tracking and trend analysis
+- 🚧 Landing Page audit system
+- 📋 Quality Score Agent (planned)
+- 📋 Landing Page Agent (planned)
+
+---
+
 ## System Architecture
 
 ### Tech Stack
@@ -96,8 +134,9 @@ BaseAgent (Abstract)
 
 ### Specialized Agents
 
-#### 1. **Campaign Health Agent** (Phase 1 - COMPLETED)
-- **Model**: Claude Sonnet 4.5
+#### 1. **Campaign Health Agent** ✅ **IMPLEMENTED**
+- **Status**: Deployed and running in production
+- **Model**: Claude Sonnet 4.5 (via Portkey)
 - **Schedule**: Daily @ 7:00 AM
 - **Scope**: Account-level campaign monitoring
 - **Triggers**: Quality Score < 5, Zero conversions (30d), CTR < 2%
@@ -105,9 +144,11 @@ BaseAgent (Abstract)
   - Pause underperforming ad groups
   - Delegate to Keyword Agent (low QS)
   - Delegate to Ad Copy Agent (low CTR)
-- **Output**: Up to 50 recommendations/day
+- **Actual Output**: ~5,900 recommendations per run (based on production data)
+- **Implementation Notes**: Fully operational with Slack approval workflow, generates recommendations and posts to Slack for human approval
 
-#### 2. **Quality Score Agent** (Phase 2.5 - TODO)
+#### 2. **Quality Score Agent** 📋 **PLANNED** (Phase 2.5)
+- **Status**: Schema deployed, agent implementation pending
 - **Model**: Claude Sonnet 4.5
 - **Schedule**: Daily @ 9:00 AM (after Campaign Health & Keyword)
 - **Scope**: Keyword-level QS monitoring with trend analysis
@@ -118,8 +159,10 @@ BaseAgent (Abstract)
   - Delegate to Ad Copy Agent (Ad Relevance issues)
   - Delegate to Landing Page Agent (LP Experience issues)
 - **Sync-Group Aware**: Aggregates QS by keyword text across geos
+- **Table**: `quality_score_history` exists in BigQuery
 
-#### 3. **Keyword Agent** (Phase 3 - TODO)
+#### 3. **Keyword Agent** 📋 **PLANNED** (Phase 3)
+- **Status**: Not yet implemented
 - **Model**: Claude Sonnet
 - **Schedule**: Daily @ 8:00 AM
 - **Scope**: Search term analysis & keyword expansion
@@ -130,7 +173,8 @@ BaseAgent (Abstract)
   - Remove low-volume keywords (0 impr/90d)
 - **Sync-Group Aware**: Propagates keyword changes to all campaigns in sync group
 
-#### 4. **Ad Copy Agent** (Phase 4 - TODO)
+#### 4. **Ad Copy Agent** 📋 **PLANNED** (Phase 4)
+- **Status**: Not yet implemented
 - **Models**: Gemini Flash (generation) + Claude Sonnet (strategy)
 - **Schedule**: On-demand only (triggered by Campaign Health or QS Agent)
 - **Scope**: RSA asset generation with brand compliance
@@ -141,7 +185,8 @@ BaseAgent (Abstract)
   - Pin brand compliance elements
 - **Sync-Group Aware**: Propagates new RSAs to all campaigns in sync group
 
-#### 5. **Bid Modifier Agent** (Phase 5 - TODO)
+#### 5. **Bid Modifier Agent** 📋 **PLANNED** (Phase 5)
+- **Status**: Not yet implemented
 - **Model**: Gemini Pro
 - **Schedule**: Weekly @ Monday 9:00 AM
 - **Scope**: Device/location/time/audience bid modifiers
@@ -152,7 +197,8 @@ BaseAgent (Abstract)
   - Adjust time-of-day modifiers
 - **Guardrails**: Max ±30 percentage points per week
 
-#### 6. **Landing Page Agent** (Phase 2.5 - TODO)
+#### 6. **Landing Page Agent** 📋 **PLANNED** (Phase 2.5)
+- **Status**: Schema deployed, agent implementation pending
 - **Model**: Claude Sonnet
 - **Schedule**: Weekly @ Tuesday 10:00 AM, or on-demand (QS Agent trigger)
 - **Scope**: Landing page health checks and content relevance
@@ -177,6 +223,56 @@ Quality Score Agent
 ├─> Ad Copy Agent (if Ad Relevance degraded)
 └─> Landing Page Agent (if LP Experience degraded)
 ```
+
+---
+
+## LLM Integration Architecture
+
+### Portkey Gateway (Production)
+
+All LLM calls in production route through **Portkey** (https://portkey.ai), an AI gateway that provides:
+
+**Key Features**:
+- **Unified API**: Single interface for Claude (Anthropic) and Gemini (Google)
+- **Semantic Caching**: Reduces costs by caching similar prompts (configurable TTL)
+- **Request Logging**: All LLM calls logged with metadata to BigQuery `llm_calls` table
+- **Error Handling**: Automatic retries with exponential backoff
+- **Cost Tracking**: Real-time token usage and cost estimation
+
+**Configuration**:
+```python
+# src/core/llm_clients_portkey.py
+client = Portkey(
+    api_key=settings.portkey_api_key,
+    virtual_key=settings.portkey_virtual_key_anthropic,  # or _google
+)
+
+# Enable caching
+if settings.portkey_enable_cache:
+    kwargs["cache"] = {
+        "mode": "semantic",
+        "max_age": settings.portkey_cache_ttl,
+    }
+```
+
+**Models in Use**:
+- **Campaign Health Agent**: `claude-sonnet-4-5` via Portkey
+- **Quality Score Agent**: `claude-sonnet-4-5` via Portkey (planned)
+- **Keyword Agent**: `claude-sonnet-4-5` via Portkey (planned)
+- **Ad Copy Agent**: `gemini-2.0-flash` via Portkey (planned)
+- **Bid Modifier Agent**: `gemini-2.0-flash` via Portkey (planned)
+- **Landing Page Agent**: `claude-sonnet-4-5` via Portkey (planned)
+
+**Call Tracking**:
+Every LLM call is logged to `llm_calls` table with:
+- Token counts (prompt, completion, total)
+- Response time (ms)
+- Cost estimate (USD)
+- Portkey request ID (for debugging)
+- Cache hit status
+
+**Direct API Fallback**:
+The codebase also includes `src/core/llm_clients.py` for direct Anthropic/Google API calls, but this is **not used in production**. All production traffic routes through Portkey.
 
 ---
 
@@ -227,7 +323,7 @@ Quality Score Agent
 7. USER INTERACTION (Slack)
    │
    ├─> User clicks "Approve" or "Reject"
-   ├─> Slack sends webhook to /api/v1/slack/interaction
+   ├─> Slack sends webhook to /api/v1/slack/interactions
    ├─> Update `agent_recommendations.approval_status`
    ├─> Update Slack message with result
    │
@@ -297,11 +393,65 @@ Quality Score Agent
    - Error notifications
    - Async task triggers
 
+### Current Limitations (Phase 1 Implementation)
+
+The following features from the design spec are not yet implemented:
+
+**Approval Workflow**:
+- ✅ Slack buttons update message UI correctly
+- ❌ `apply_changes()` is NOT automatically triggered after approval (requires manual execution or future implementation)
+- ❌ No approval timeout (8-hour auto-reject not implemented)
+- ❌ No escalation reminder (4-hour warning not implemented)
+- ❌ Approval events are logged to BigQuery but don't trigger downstream actions
+
+**Pub/Sub Integration**:
+- ✅ Agents can publish delegation events to Pub/Sub topics
+- ❌ No subscription handlers consuming Pub/Sub messages
+- ❌ Agent delegation is logged but not actioned (e.g., Campaign Health can't actually trigger Keyword Agent yet)
+
+**Orchestrator**:
+- ✅ Can run specific agents via `/api/v1/orchestrator/run`
+- ❌ Status endpoint `/api/v1/orchestrator/status/{run_id}` returns `"not_implemented"`
+- ❌ Orchestrator doesn't autonomously decide which agents to run (requires explicit `agent_type` parameter)
+
+**Kill Switch**:
+- ✅ Uses environment variable `DRY_RUN=true` to prevent mutations
+- ❌ Kill switch is not stored in BigQuery (no persistence across restarts)
+- ❌ `/api/v1/agents/kill-switch` endpoint modifies in-memory setting only
+
+**Tables Not Yet Used**:
+- `kill_switch_status` (not created in Terraform)
+- `slack_approvals` (not created in Terraform)
+- `google_ads_sync_log` (not created in Terraform)
+- `rate_limit_tracker` (not created in Terraform)
+
 ---
 
 ## BigQuery Table Schemas
 
-### Core Tables (9 Original)
+**Dataset**: `sem_agents`
+
+**Tables Deployed** (12 total in Terraform):
+- ✅ `agent_config` - Agent configuration and thresholds
+- ✅ `agent_recommendations` - Generated recommendations with approval workflow
+- ✅ `agent_audit_log` - Complete audit trail
+- ✅ `agent_state` - Agent run tracking (replaces `agent_runs` in original spec)
+- ✅ `brand_guidelines` - Brand voice and compliance rules
+- ✅ `recommendation_history` - Recommendation lifecycle events
+- ✅ `llm_calls` - LLM API usage tracking (replaces `llm_usage_log` in spec)
+- ✅ `approval_events` - Slack approval interaction tracking
+- ✅ `performance_metrics` - Before/after performance tracking
+- ✅ `campaign_taxonomy` - Campaign classification and sync groups (Phase 2.5)
+- ✅ `quality_score_history` - Daily QS snapshots (Phase 2.5)
+- ✅ `landing_page_audits` - LP health checks (Phase 2.5)
+
+**Tables NOT Implemented**:
+- ❌ `kill_switch_status` - Using environment variable instead
+- ❌ `slack_approvals` - Approvals tracked in `approval_events`
+- ❌ `google_ads_sync_log` - Not yet implemented
+- ❌ `rate_limit_tracker` - Rate limiting handled in-memory
+
+### Core Tables
 
 #### 1. `agent_config`
 Configuration for agent behavior (thresholds, limits, settings).
@@ -325,297 +475,319 @@ CLUSTER BY agent_type, config_key;
 -- config_id: 'ch_ctr_min', agent_type: 'campaign_health', config_key: 'ctr_threshold', config_value: '0.02', data_type: 'float'
 ```
 
-#### 2. `agent_recommendations`
+#### 2. `agent_recommendations` ✅ **DEPLOYED**
 All recommendations generated by agents, with approval status and execution results.
 
+**Actual Terraform Schema**:
 ```sql
 CREATE TABLE sem_agents.agent_recommendations (
-  recommendation_id STRING NOT NULL,
-  agent_type STRING NOT NULL,
-  run_id STRING NOT NULL,               -- Links all recs from same agent execution
-  entity_type STRING NOT NULL,           -- 'campaign', 'ad_group', 'keyword', 'ad'
-  entity_id STRING NOT NULL,             -- Google Ads resource name
-  entity_name STRING,
-  recommendation_type STRING NOT NULL,   -- 'pause_ad_group', 'add_negative_keyword', etc.
-  recommendation_data JSON NOT NULL,     -- Action-specific data (keyword text, match type, etc.)
-  confidence_score FLOAT64,              -- 0.0 to 1.0
-  estimated_impact JSON,                 -- { "metric": "CTR", "direction": "increase", "magnitude": "10-20%" }
-  reasoning TEXT,                        -- LLM's explanation
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  approval_status STRING NOT NULL,       -- 'pending', 'approved', 'rejected', 'expired', 'applied', 'failed'
-  approved_by STRING,
+  id STRING NOT NULL,                    -- Recommendation ID
+  run_id STRING NOT NULL,                -- Links all recs from same agent execution
+  agent_type STRING NOT NULL,            -- 'campaign_health', 'keyword', 'ad_copy', etc.
+  created_at TIMESTAMP NOT NULL,
+  title STRING NOT NULL,                 -- Human-readable summary
+  description STRING,                    -- Detailed description
+  rationale STRING,                      -- LLM's reasoning
+  impact_estimate STRING,                -- Estimated impact (text description)
+  risk_level STRING,                     -- 'low', 'medium', 'high'
+  action_type STRING NOT NULL,           -- 'pause_ad_group', 'add_negative_keyword', etc.
+  action_params JSON,                    -- Action-specific data (campaign_id, ad_group_id, etc.)
+  status STRING NOT NULL,                -- 'pending', 'approved', 'rejected', 'applied', 'failed'
+  approval_status STRING,                -- Tracks approval workflow state
+  approved_by STRING,                    -- User who approved
   approved_at TIMESTAMP,
-  executed_at TIMESTAMP,
-  execution_result JSON,                 -- { "status": "success", "operation_id": "...", "error": null }
-  sync_group_id STRING                   -- NULL if individual campaign, else sync group identifier
+  applied_at TIMESTAMP,                  -- When action was executed
+  applied_result JSON,                   -- Execution result
+  error_message STRING,                  -- Error if failed
+  metadata JSON                          -- Additional context
 )
 PARTITION BY DATE(created_at)
-CLUSTER BY agent_type, approval_status, entity_type;
-```
-
-#### 3. `agent_audit_log`
-Complete audit trail of every action taken by agents.
-
-```sql
-CREATE TABLE sem_agents.agent_audit_log (
-  audit_id STRING NOT NULL,
-  timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  agent_type STRING NOT NULL,
-  run_id STRING,
-  recommendation_id STRING,
-  action_type STRING NOT NULL,           -- 'analyze', 'recommend', 'approve', 'execute', 'error'
-  entity_type STRING,
-  entity_id STRING,
-  action_details JSON NOT NULL,          -- Full context of what happened
-  user_email STRING,                     -- Who approved (if applicable)
-  dry_run BOOL NOT NULL,
-  success BOOL NOT NULL,
-  error_message STRING
-)
-PARTITION BY DATE(timestamp)
-CLUSTER BY agent_type, action_type;
-```
-
-#### 4. `agent_runs`
-Summary of each agent execution (start time, end time, result counts).
-
-```sql
-CREATE TABLE sem_agents.agent_runs (
-  run_id STRING NOT NULL,
-  agent_type STRING NOT NULL,
-  started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  completed_at TIMESTAMP,
-  status STRING NOT NULL,                -- 'running', 'completed', 'failed', 'dry_run'
-  trigger_source STRING,                 -- 'scheduler', 'manual', 'delegate'
-  total_recommendations INT64,
-  approved_count INT64,
-  rejected_count INT64,
-  applied_count INT64,
-  failed_count INT64,
-  error_message STRING,
-  execution_metadata JSON                -- { "llm_tokens": 5000, "api_calls": 120, "execution_time_sec": 45 }
-)
-PARTITION BY DATE(started_at)
 CLUSTER BY agent_type, status;
 ```
 
-#### 5. `kill_switch_status`
-Single-row table to enable/disable all agent executions.
+**Note**: This schema differs from the original spec. Key changes:
+- `id` instead of `recommendation_id`
+- Simplified to `title`/`description`/`rationale` instead of `entity_type`/`entity_id`/`entity_name`
+- `action_params` JSON contains all action details (more flexible than separate columns)
+- `impact_estimate` is text, not structured JSON
+- `applied_at` and `applied_result` instead of `executed_at` and `execution_result`
 
+#### 3. `agent_audit_log` ✅ **DEPLOYED**
+Complete audit trail of every action taken by agents.
+
+**Actual Terraform Schema**:
 ```sql
-CREATE TABLE sem_agents.kill_switch_status (
-  enabled BOOL NOT NULL DEFAULT FALSE,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  updated_by STRING NOT NULL,
-  reason STRING
-);
-
--- Initialize with:
-INSERT INTO sem_agents.kill_switch_status (enabled, updated_by, reason)
-VALUES (FALSE, 'system', 'Initial setup');
-```
-
-#### 6. `slack_approvals`
-Tracks approval request messages sent to Slack.
-
-```sql
-CREATE TABLE sem_agents.slack_approvals (
-  approval_id STRING NOT NULL,
+CREATE TABLE sem_agents.agent_audit_log (
   run_id STRING NOT NULL,
   agent_type STRING NOT NULL,
-  slack_channel_id STRING NOT NULL,
-  slack_message_ts STRING NOT NULL,      -- Timestamp ID of message for updates
-  recommendation_ids ARRAY<STRING> NOT NULL,
-  request_sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  expires_at TIMESTAMP NOT NULL,         -- Auto-reject after 8 hours
-  escalated_at TIMESTAMP,                -- Escalation reminder at 4 hours
-  resolved_at TIMESTAMP,
-  resolution STRING                      -- 'approved', 'rejected', 'expired', 'error'
+  event_type STRING NOT NULL,            -- 'started', 'completed', 'error', 'approval_requested', etc.
+  timestamp TIMESTAMP NOT NULL,
+  details JSON                           -- Full context of what happened
 )
-PARTITION BY DATE(request_sent_at)
-CLUSTER BY agent_type, resolution;
+PARTITION BY DATE(timestamp)
+CLUSTER BY agent_type, event_type;
 ```
 
-#### 7. `google_ads_sync_log`
-Tracks successful synchronizations from Google Ads Data Transfer Service.
+**Note**: Simplified from original spec - uses `event_type` + `details` JSON rather than many columns.
 
+#### 4. `agent_state` ✅ **DEPLOYED**
+Summary of each agent execution (replaces `agent_runs` from spec).
+
+**Actual Terraform Schema**:
 ```sql
-CREATE TABLE sem_agents.google_ads_sync_log (
-  sync_id STRING NOT NULL,
-  table_name STRING NOT NULL,            -- 'p_ads_Campaign_1234567890', etc.
-  data_date DATE NOT NULL,               -- Date of data in the table
-  sync_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  rows_imported INT64,
-  sync_status STRING NOT NULL,           -- 'success', 'partial', 'failed'
-  error_message STRING
-)
-PARTITION BY data_date
-CLUSTER BY table_name, sync_status;
-```
-
-#### 8. `llm_usage_log`
-Tracks LLM API usage for cost monitoring and debugging.
-
-```sql
-CREATE TABLE sem_agents.llm_usage_log (
-  usage_id STRING NOT NULL,
-  timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+CREATE TABLE sem_agents.agent_state (
+  run_id STRING NOT NULL,
+  parent_run_id STRING,                  -- For delegated agent runs
   agent_type STRING NOT NULL,
-  run_id STRING,
-  model_provider STRING NOT NULL,        -- 'anthropic', 'google'
-  model_name STRING NOT NULL,            -- 'claude-sonnet-4.5', 'gemini-pro'
+  status STRING NOT NULL,                -- 'running', 'completed', 'failed'
+  started_at TIMESTAMP NOT NULL,
+  completed_at TIMESTAMP,
+  error STRING                           -- Error message if failed
+)
+-- No partitioning (small table)
+```
+
+**Note**: Simplified from original spec. Recommendation counts are computed from `agent_recommendations` table rather than stored here.
+
+#### 5. `brand_guidelines` ✅ **DEPLOYED**
+Brand voice and compliance rules for ad copy generation.
+
+**Actual Terraform Schema**:
+```sql
+CREATE TABLE sem_agents.brand_guidelines (
+  customer_id STRING NOT NULL,
+  brand_voice STRING,                    -- Brand voice description
+  prohibited_terms ARRAY<STRING>,        -- Terms to avoid
+  required_phrases ARRAY<STRING>,        -- Required brand phrases
+  updated_at TIMESTAMP NOT NULL,
+  updated_by STRING
+)
+```
+
+#### 6. `recommendation_history` ✅ **DEPLOYED**
+Tracks lifecycle events for recommendations (created, approved, rejected, applied, etc.).
+
+**Actual Terraform Schema**:
+```sql
+CREATE TABLE sem_agents.recommendation_history (
+  history_id STRING NOT NULL,
+  recommendation_id STRING NOT NULL,
+  run_id STRING NOT NULL,
+  event_type STRING NOT NULL,            -- 'created', 'approved', 'rejected', 'applied', 'failed'
+  event_timestamp TIMESTAMP NOT NULL,
+  from_status STRING,
+  to_status STRING,
+  actor_type STRING,                     -- 'user', 'system', 'agent'
+  actor_id STRING,
+  actor_name STRING,
+  event_details JSON
+)
+PARTITION BY DATE(event_timestamp)
+CLUSTER BY recommendation_id, event_type;
+```
+
+#### 7. `llm_calls` ✅ **DEPLOYED**
+Tracks LLM API usage for cost monitoring and debugging (via Portkey).
+
+**Actual Terraform Schema**:
+```sql
+CREATE TABLE sem_agents.llm_calls (
+  call_id STRING NOT NULL,
+  run_id STRING NOT NULL,
+  agent_type STRING NOT NULL,
+  provider STRING NOT NULL,              -- 'anthropic', 'google'
+  model STRING NOT NULL,                 -- 'claude-sonnet-4-5', 'gemini-2.0-flash'
+  timestamp TIMESTAMP NOT NULL,
   prompt_tokens INT64,
   completion_tokens INT64,
   total_tokens INT64,
-  latency_ms INT64,
+  response_time_ms INT64,
   cost_usd FLOAT64,
-  request_metadata JSON                  -- { "temperature": 0.7, "max_tokens": 4096, "purpose": "campaign_analysis" }
+  error_code STRING,
+  error_message STRING,
+  portkey_request_id STRING,             -- Portkey gateway request ID
+  cache_hit BOOL                         -- Whether response was cached
 )
-PARTITION BY DATE(timestamp)
-CLUSTER BY agent_type, model_provider;
+PARTITION BY DATE(timestamp) (90-day expiration)
+CLUSTER BY provider, model, agent_type;
 ```
 
-#### 9. `rate_limit_tracker`
-Per-agent rate limiting state.
+#### 8. `approval_events` ✅ **DEPLOYED**
+Tracks Slack approval interactions (replaces `slack_approvals` from spec).
 
+**Actual Terraform Schema**:
 ```sql
-CREATE TABLE sem_agents.rate_limit_tracker (
-  agent_type STRING NOT NULL,
-  window_start TIMESTAMP NOT NULL,       -- Start of rate limit window (1-minute buckets)
-  operation_count INT64 NOT NULL,        -- Number of operations in this window
-  last_operation_at TIMESTAMP NOT NULL
+CREATE TABLE sem_agents.approval_events (
+  event_id STRING NOT NULL,
+  recommendation_id STRING NOT NULL,
+  run_id STRING NOT NULL,
+  event_timestamp TIMESTAMP NOT NULL,
+  user_id STRING NOT NULL,               -- Slack user ID
+  user_name STRING,
+  decision STRING NOT NULL,              -- 'approved', 'rejected'
+  decision_reason STRING,
+  time_to_decision_seconds INT64,
+  slack_message_ts STRING                -- Slack message timestamp
 )
-PARTITION BY DATE(window_start)
-CLUSTER BY agent_type;
+PARTITION BY DATE(event_timestamp)
+CLUSTER BY user_id, decision;
+```
+
+#### 9. `performance_metrics` ✅ **DEPLOYED**
+Before/after performance tracking for applied recommendations.
+
+**Actual Terraform Schema**:
+```sql
+CREATE TABLE sem_agents.performance_metrics (
+  metric_id STRING NOT NULL,
+  recommendation_id STRING NOT NULL,
+  campaign_id STRING NOT NULL,
+  ad_group_id STRING,
+  metric_date DATE NOT NULL,
+  metric_type STRING NOT NULL,           -- 'CTR', 'conversions', 'cost', 'QS', etc.
+  before_value FLOAT64,
+  after_value FLOAT64,
+  change_value FLOAT64,
+  change_percent FLOAT64,
+  is_statistically_significant BOOL
+)
+PARTITION BY metric_date
+CLUSTER BY recommendation_id, metric_type;
 ```
 
 ---
 
-### Phase 2.5 Tables (3 New)
+### Tables NOT Implemented
 
-#### 10. `campaign_taxonomy`
+The following tables from the original spec are **not** created in Terraform:
+
+#### ❌ `kill_switch_status`
+**Reason**: Using environment variable `DRY_RUN=true` instead of database table for kill switch.
+
+#### ❌ `slack_approvals`
+**Reason**: Approval tracking handled by `approval_events` table.
+
+#### ❌ `google_ads_sync_log`
+**Reason**: Not yet implemented. Google Ads Data Transfer Service runs directly without tracking.
+
+#### ❌ `rate_limit_tracker`
+**Reason**: Rate limiting handled in-memory within agent execution, not persisted.
+
+---
+
+### Phase 2.5 Tables (Campaign Taxonomy & Quality Analysis)
+
+#### 10. `campaign_taxonomy` ✅ **DEPLOYED**
 Campaign classification and sync group management.
 
+**Actual Terraform Schema**:
 ```sql
 CREATE TABLE sem_agents.campaign_taxonomy (
-  campaign_id STRING NOT NULL,           -- Google Ads campaign ID
+  campaign_id STRING NOT NULL,
   campaign_name STRING NOT NULL,
-  account_id STRING NOT NULL,
-
-  -- Classification
-  campaign_type STRING NOT NULL,         -- 'brand', 'nonbrand', 'competitor', 'shopping', 'display'
-  intent_category STRING,                -- 'ai_code', 'ai_chat', 'alternatives', 'comparison', etc.
-  geo STRING,                            -- 'US', 'UK', 'DE', 'FR', etc.
-
-  -- Sync Group Configuration
-  sync_group_id STRING,                  -- NULL if individual, else e.g., 'nonbrand_ai_code_v1'
-  sync_group_role STRING,                -- 'template', 'replica', 'individual'
-  template_campaign_id STRING,           -- Points to template campaign if this is a replica
-  management_strategy STRING NOT NULL,   -- 'synced' (propagate changes) or 'individual'
-
-  -- Metadata
-  auto_detected BOOL NOT NULL DEFAULT TRUE,  -- TRUE if auto-classified from naming convention
-  confidence_score FLOAT64,              -- 0.0 to 1.0 for auto-detection confidence
-  manually_verified BOOL NOT NULL DEFAULT FALSE,
-  verified_by STRING,
-  verified_at TIMESTAMP,
-
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP()
+  customer_id STRING NOT NULL,
+  campaign_type STRING NOT NULL,         -- 'brand', 'nonbrand', 'competitor'
+  vertical STRING NOT NULL,              -- Product vertical classification
+  geo STRING NOT NULL,                   -- 'US', 'UK', 'DE', 'FR', etc.
+  sync_group STRING NOT NULL,            -- Sync group identifier
+  management_strategy STRING NOT NULL,   -- 'synced' or 'individual'
+  is_template BOOL NOT NULL,             -- TRUE if this is the template campaign
+  detection_method STRING NOT NULL,      -- How it was classified: 'naming_convention', 'manual', 'llm'
+  detection_confidence FLOAT64,          -- Confidence score (0.0-1.0)
+  campaign_status STRING,                -- Campaign status from Google Ads
+  created_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+  updated_by STRING,
+  notes STRING,
+  agent_exclusions ARRAY<STRING>,        -- Agent types to exclude from this campaign
+  external_manager STRING                -- If externally managed (e.g., 'pmax_team')
 )
-PARTITION BY DATE(updated_at)
-CLUSTER BY sync_group_id, campaign_type;
-
--- Example rows:
--- NonBrand_AI-Code_US: sync_group_id='nonbrand_ai_code_v1', sync_group_role='template', management_strategy='synced'
--- NonBrand_AI-Code_UK: sync_group_id='nonbrand_ai_code_v1', sync_group_role='replica', template_campaign_id='12345', management_strategy='synced'
--- Competitor_GitHub: sync_group_id=NULL, sync_group_role='individual', management_strategy='individual'
+-- No partition (relatively small table)
+CLUSTER BY sync_group, campaign_type;
 ```
 
-#### 11. `quality_score_history`
+**Note**: Simplified from spec. Uses `vertical` instead of `intent_category`, `is_template` bool instead of `sync_group_role` enum.
+
+#### 11. `quality_score_history` ✅ **DEPLOYED**
 Daily snapshots of keyword Quality Scores for trend analysis.
 
+**Actual Terraform Schema**:
 ```sql
 CREATE TABLE sem_agents.quality_score_history (
   snapshot_id STRING NOT NULL,
   snapshot_date DATE NOT NULL,
-
-  -- Entity identifiers
   campaign_id STRING NOT NULL,
-  campaign_name STRING NOT NULL,
   ad_group_id STRING NOT NULL,
-  ad_group_name STRING NOT NULL,
   keyword_id STRING NOT NULL,
   keyword_text STRING NOT NULL,
-  match_type STRING NOT NULL,
+  match_type STRING,
 
   -- Quality Score components
   quality_score INT64,                   -- 1-10 or NULL if unavailable
-  quality_score_expected_ctr STRING,     -- 'BELOW_AVERAGE', 'AVERAGE', 'ABOVE_AVERAGE'
-  quality_score_ad_relevance STRING,
-  quality_score_landing_page STRING,
+  expected_ctr STRING,                   -- 'BELOW_AVERAGE', 'AVERAGE', 'ABOVE_AVERAGE'
+  ad_relevance STRING,
+  landing_page_experience STRING,
 
-  -- Performance context (last 30 days)
+  -- Performance metrics
   impressions INT64,
   clicks INT64,
-  ctr FLOAT64,
   cost_micros INT64,
   conversions FLOAT64,
 
-  -- Sync group context
-  sync_group_id STRING,                  -- From campaign_taxonomy
+  -- Taxonomy context (denormalized from campaign_taxonomy)
+  sync_group STRING,
+  campaign_type STRING,
+  vertical STRING,
+  geo STRING,
 
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP()
+  created_at TIMESTAMP NOT NULL
 )
-PARTITION BY snapshot_date
-CLUSTER BY sync_group_id, campaign_id, quality_score;
-
--- Enables queries like:
--- "Show me keywords where QS dropped ≥2 points in last 7 days"
--- "Find geo-specific QS issues for sync group 'nonbrand_ai_code_v1'"
+PARTITION BY snapshot_date (365-day expiration)
+CLUSTER BY sync_group, campaign_id;
 ```
 
-#### 12. `landing_page_audits`
+**Note**: Column names simplified (`expected_ctr` not `quality_score_expected_ctr`). Includes denormalized taxonomy fields for faster queries.
+
+#### 12. `landing_page_audits` ✅ **DEPLOYED**
 Landing page health checks and content relevance analysis.
 
+**Actual Terraform Schema**:
 ```sql
 CREATE TABLE sem_agents.landing_page_audits (
   audit_id STRING NOT NULL,
   audit_date DATE NOT NULL,
-
-  -- Page identifiers
-  final_url STRING NOT NULL,             -- The landing page URL
-  url_hash STRING NOT NULL,              -- SHA256 hash for deduplication
-  campaigns ARRAY<STRING>,               -- List of campaign IDs using this URL
-  sync_groups ARRAY<STRING>,             -- Deduplicated sync groups using this URL
+  url STRING NOT NULL,                   -- The landing page URL
+  url_hash STRING NOT NULL,              -- For deduplication
 
   -- PageSpeed Insights metrics
-  performance_score INT64,               -- 0-100
-  first_contentful_paint_ms INT64,       -- FCP
-  largest_contentful_paint_ms INT64,     -- LCP
-  cumulative_layout_shift FLOAT64,       -- CLS
-  time_to_interactive_ms INT64,          -- TTI
-  speed_index INT64,
+  performance_score FLOAT64,             -- 0.0-100.0
+  fcp_ms INT64,                          -- First Contentful Paint
+  lcp_ms INT64,                          -- Largest Contentful Paint
+  cls FLOAT64,                           -- Cumulative Layout Shift
+  mobile_friendly BOOL,
+  is_accessible BOOL,
+  http_status_code INT64,
+  redirect_chain ARRAY<STRING>,
 
-  -- Content relevance analysis (LLM-powered)
-  content_summary TEXT,                  -- Claude's understanding of page content
-  relevance_score FLOAT64,               -- 0.0-1.0: how well LP matches expected keywords/ads
-  relevance_reasoning TEXT,              -- Why this score was assigned
-  improvement_suggestions ARRAY<STRING>, -- Actionable recommendations
+  -- Content analysis
+  content_hash STRING,                   -- Hash of page content for change detection
+  content_relevance_score FLOAT64,       -- 0.0-1.0
+  keyword_alignment_score FLOAT64,       -- How well LP matches keywords
+  improvement_suggestions JSON,          -- Structured recommendations
 
-  -- Audit metadata
-  audit_triggered_by STRING,             -- 'scheduled', 'qs_agent', 'manual'
-  audit_status STRING NOT NULL,          -- 'completed', 'failed', 'partial'
-  error_message STRING,
+  -- Usage context
+  sync_groups ARRAY<STRING>,             -- Which sync groups use this URL
+  campaign_ids ARRAY<STRING>,            -- Which campaigns use this URL
+  keyword_count INT64,                   -- How many keywords point to this URL
 
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP()
+  created_at TIMESTAMP NOT NULL,
+  next_audit_date DATE                   -- When to re-audit
 )
-PARTITION BY audit_date
+PARTITION BY audit_date (365-day expiration)
 CLUSTER BY url_hash;
-
--- Deduplication logic: Same URL used in US/UK/DE campaigns = single audit
--- URLs stored with trailing slash normalized, query params sorted
 ```
+
+**Note**: Column names abbreviated (`fcp_ms` not `first_contentful_paint_ms`). Uses `improvement_suggestions` JSON instead of ARRAY<STRING>. Removed audit metadata fields (status, triggered_by).
 
 ---
 
@@ -853,8 +1025,13 @@ create_or_update_secret() {
 # Google Ads credentials (JSON format)
 create_or_update_secret "google-ads-credentials" '{"developer_token": "YOUR_TOKEN", "client_id": "...", "client_secret": "...", "refresh_token": "..."}'
 
-# Anthropic API key
+# Anthropic API key (legacy - Portkey is primary in production)
 create_or_update_secret "anthropic-api-key" "sk-ant-..."
+
+# Portkey configuration (PRODUCTION LLM GATEWAY)
+create_or_update_secret "portkey-api-key" "YOUR_PORTKEY_API_KEY"
+create_or_update_secret "portkey-virtual-key-anthropic" "YOUR_ANTHROPIC_VIRTUAL_KEY"
+create_or_update_secret "portkey-virtual-key-google" "YOUR_GOOGLE_VIRTUAL_KEY"
 
 # Slack bot token
 create_or_update_secret "slack-bot-token" "xoxb-..."
@@ -874,14 +1051,14 @@ terraform apply -var="google_ads_creds_json=..." -var="anthropic_key=..."
 
 ```bash
 # Set service account (will be created by Terraform, or create manually)
-SERVICE_ACCOUNT="sem-agents@$PROJECT_ID.iam.gserviceaccount.com"
+SERVICE_ACCOUNT="sa-sem-agents@$PROJECT_ID.iam.gserviceaccount.com"
 
 # Check if service account exists
 gcloud iam service-accounts describe $SERVICE_ACCOUNT 2>/dev/null || \
-  gcloud iam service-accounts create sem-agents --display-name="SEM Agents Runtime"
+  gcloud iam service-accounts create sa-sem-agents --display-name="SEM Agents Runtime"
 
 # Grant access to secrets (safe to run multiple times)
-for secret in google-ads-credentials anthropic-api-key slack-bot-token slack-signing-secret; do
+for secret in google-ads-credentials anthropic-api-key portkey-api-key portkey-virtual-key-anthropic portkey-virtual-key-google slack-bot-token slack-signing-secret; do
   echo "Granting $SERVICE_ACCOUNT access to $secret..."
   gcloud secrets add-iam-policy-binding $secret \
     --member="serviceAccount:$SERVICE_ACCOUNT" \
@@ -891,7 +1068,7 @@ done
 
 # Verify permissions
 echo -e "\nVerifying secret access..."
-for secret in google-ads-credentials anthropic-api-key slack-bot-token slack-signing-secret; do
+for secret in google-ads-credentials anthropic-api-key portkey-api-key portkey-virtual-key-anthropic portkey-virtual-key-google slack-bot-token slack-signing-secret; do
   echo "Checking $secret:"
   gcloud secrets get-iam-policy $secret --filter="bindings.members:$SERVICE_ACCOUNT" --format="value(bindings.role)"
 done
@@ -915,7 +1092,7 @@ done
 #### 3.2 Configure Interactivity
 1. In app settings → **Interactivity & Shortcuts**
 2. Turn on **Interactivity**
-3. Set **Request URL**: `https://YOUR_CLOUD_RUN_URL/api/v1/slack/interaction`
+3. Set **Request URL**: `https://YOUR_CLOUD_RUN_URL/api/v1/slack/interactions`
 4. Save changes
 
 #### 3.3 Install to Workspace
@@ -956,11 +1133,11 @@ terraform apply tfplan
 ```
 
 This provisions:
-- **BigQuery**: Datasets and tables
+- **BigQuery**: Datasets and 12 tables (see schema section)
 - **Pub/Sub**: Topics (`agent-tasks`, `agent-approvals`)
-- **Cloud Run**: Service with container image placeholder
+- **Cloud Run**: Service `sem-gcp-agents` with container image placeholder
 - **Cloud Scheduler**: Jobs for each agent (initially paused)
-- **IAM**: Service account with permissions
+- **IAM**: Service account `sa-sem-agents@` with permissions
 - **Secret Manager**: Secrets (if not already created)
 
 **Expected Output**:
@@ -968,36 +1145,52 @@ This provisions:
 Apply complete! Resources: 47 added, 0 changed, 0 destroyed.
 
 Outputs:
-cloud_run_url = "https://sem-agents-HASH-uc.a.run.app"
-service_account_email = "sem-agents@your-project-id.iam.gserviceaccount.com"
+cloud_run_url = "https://sem-gcp-agents-HASH-uc.a.run.app"
+service_account_email = "sa-sem-agents@your-project-id.iam.gserviceaccount.com"
 ```
 
 ---
 
 ### Step 5: Build & Deploy Application
 
-#### 5.1 Build Docker Image
-```bash
-# Authenticate Docker to GCR
-gcloud auth configure-docker
+**Note**: In production, deployment is automated via Cloud Build CI/CD pipeline. The pipeline triggers on git push to `main` branch and automatically builds and deploys to Cloud Run.
 
-# Build image
-docker build -t gcr.io/YOUR_PROJECT_ID/sem-gcp-agents:v1.0.0 .
-docker push gcr.io/YOUR_PROJECT_ID/sem-gcp-agents:v1.0.0
+#### 5.1 Automated Deployment (Production)
+```bash
+# Simply push to main branch
+git push origin main
+
+# Cloud Build automatically:
+# 1. Builds Docker image
+# 2. Pushes to Artifact Registry (us-central1-docker.pkg.dev/...)
+# 3. Deploys to Cloud Run service `sem-gcp-agents`
+# 4. Updates service with latest image
+
+# Monitor build progress
+gcloud builds list --limit 5
+gcloud builds log <BUILD_ID>
 ```
 
-**Or use Cloud Build**:
+#### 5.2 Manual Deployment (Development/Testing)
 ```bash
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/sem-gcp-agents:v1.0.0
+# Authenticate Docker to Artifact Registry
+gcloud auth configure-docker us-central1-docker.pkg.dev
+
+# Build and push image
+docker build -t us-central1-docker.pkg.dev/YOUR_PROJECT_ID/sem-gcp-agents/app:v1.0.0 .
+docker push us-central1-docker.pkg.dev/YOUR_PROJECT_ID/sem-gcp-agents/app:v1.0.0
+
+# Or use Cloud Build
+gcloud builds submit --tag us-central1-docker.pkg.dev/YOUR_PROJECT_ID/sem-gcp-agents/app:v1.0.0
 ```
 
-#### 5.2 Deploy to Cloud Run
+#### 5.3 Deploy to Cloud Run
 ```bash
-gcloud run deploy sem-agents \
-  --image gcr.io/YOUR_PROJECT_ID/sem-gcp-agents:v1.0.0 \
+gcloud run deploy sem-gcp-agents \
+  --image us-central1-docker.pkg.dev/YOUR_PROJECT_ID/sem-gcp-agents/app:v1.0.0 \
   --platform managed \
   --region us-central1 \
-  --service-account sem-agents@YOUR_PROJECT_ID.iam.gserviceaccount.com \
+  --service-account sa-sem-agents@YOUR_PROJECT_ID.iam.gserviceaccount.com \
   --set-env-vars "PROJECT_ID=YOUR_PROJECT_ID,DRY_RUN=true" \
   --set-secrets "GOOGLE_ADS_CREDENTIALS=google-ads-credentials:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,SLACK_BOT_TOKEN=slack-bot-token:latest,SLACK_SIGNING_SECRET=slack-signing-secret:latest" \
   --max-instances 10 \
@@ -1308,7 +1501,8 @@ GROUP BY agent_type, model_name;
 **Issue**: "Slack approval not working"
 - Verify signing secret is correct
 - Check Cloud Run logs for webhook errors
-- Test interaction endpoint: `curl -X POST $SERVICE_URL/api/v1/slack/interaction`
+- Test interaction endpoint: `curl -X POST $SERVICE_URL/api/v1/slack/interactions`
+- Test approval workflow: `curl -X POST $SERVICE_URL/api/v1/agents/test-slack-approval`
 
 **Issue**: "Google Ads API quota exceeded"
 - Check rate limiting in code (1 req/sec)
