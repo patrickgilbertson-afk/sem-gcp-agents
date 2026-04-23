@@ -158,3 +158,113 @@ def _build_approval_blocks(batch: RecommendationBatch) -> list[dict]:
     )
 
     return blocks
+
+
+# ============================================================================
+# Button Action Handlers
+# ============================================================================
+
+
+@slack_app.action("approve_all")
+async def handle_approve_all(ack, body, client):
+    """Handle approve all button click."""
+    await ack()
+
+    run_id = body["actions"][0]["value"]
+    user_id = body["user"]["id"]
+
+    logger.info("approval_received", run_id=run_id, user_id=user_id, action="approve_all")
+
+    # Update message to show approval
+    try:
+        await client.chat_update(
+            channel=body["channel"]["id"],
+            ts=body["message"]["ts"],
+            text="Recommendations approved",
+            blocks=[
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"✅ *Approved by <@{user_id}>*\nRun ID: `{run_id}`\nAll recommendations will be applied.",
+                    },
+                }
+            ],
+        )
+
+        # TODO: Trigger recommendation application via Pub/Sub
+        # This will publish to approval-responses topic
+        # The orchestrator will pick it up and apply changes
+
+        logger.info("approval_processed", run_id=run_id)
+
+    except Exception as e:
+        logger.error("approval_update_failed", error=str(e))
+
+
+@slack_app.action("reject_all")
+async def handle_reject_all(ack, body, client):
+    """Handle reject all button click."""
+    await ack()
+
+    run_id = body["actions"][0]["value"]
+    user_id = body["user"]["id"]
+
+    logger.info("rejection_received", run_id=run_id, user_id=user_id, action="reject_all")
+
+    # Update message to show rejection
+    try:
+        await client.chat_update(
+            channel=body["channel"]["id"],
+            ts=body["message"]["ts"],
+            text="Recommendations rejected",
+            blocks=[
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"❌ *Rejected by <@{user_id}>*\nRun ID: `{run_id}`\nNo changes will be made.",
+                    },
+                }
+            ],
+        )
+
+        logger.info("rejection_processed", run_id=run_id)
+
+    except Exception as e:
+        logger.error("rejection_update_failed", error=str(e))
+
+
+@slack_app.action("defer")
+async def handle_defer(ack, body, client):
+    """Handle defer button click."""
+    await ack()
+
+    run_id = body["actions"][0]["value"]
+    user_id = body["user"]["id"]
+
+    logger.info("deferral_received", run_id=run_id, user_id=user_id, action="defer")
+
+    # Update message to show deferral
+    try:
+        await client.chat_update(
+            channel=body["channel"]["id"],
+            ts=body["message"]["ts"],
+            text="Recommendations deferred",
+            blocks=[
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"⏰ *Deferred by <@{user_id}>*\nRun ID: `{run_id}`\nYou'll be reminded in 24 hours.",
+                    },
+                }
+            ],
+        )
+
+        # TODO: Schedule reminder via Pub/Sub or Cloud Scheduler
+
+        logger.info("deferral_processed", run_id=run_id)
+
+    except Exception as e:
+        logger.error("deferral_update_failed", error=str(e))
