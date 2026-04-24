@@ -111,19 +111,23 @@ def _build_approval_blocks(batch: RecommendationBatch) -> list[dict]:
     Returns:
         List of Block Kit blocks
     """
+    # Add dry run indicator to header
+    dry_run_tag = " [DRY RUN]" if settings.is_dry_run else ""
+
     blocks = [
         {
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"🤖 {batch.agent_type.value.replace('_', ' ').title()} Agent Recommendations",
+                "text": f"🤖 {batch.agent_type.value.replace('_', ' ').title()} Agent Recommendations{dry_run_tag}",
             },
         },
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*Summary:* {batch.summary}\n*Total Recommendations:* {batch.total_count}\n*Run ID:* `{batch.run_id}`",
+                "text": f"*Summary:* {batch.summary}\n*Total Recommendations:* {batch.total_count}\n*Run ID:* `{batch.run_id}`"
+                        + (f"\n\n⚠️ *DRY RUN MODE* - Approving will NOT make real changes" if settings.is_dry_run else ""),
             },
         },
     ]

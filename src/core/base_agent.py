@@ -81,16 +81,16 @@ class BaseAgent(ABC):
                 {"recommendation_count": len(recommendations), "saved_to_bigquery": True},
             )
 
-            # Step 4: Request approval (if not in dry run)
-            if not self.dry_run:
-                await self.request_approval(batch)
-                await self._log_event(
-                    EventType.APPROVAL_REQUESTED,
-                    {"batch_id": str(batch.run_id)},
-                )
+            # Step 4: Request approval (always post to Slack, even in dry run)
+            await self.request_approval(batch)
+            await self._log_event(
+                EventType.APPROVAL_REQUESTED,
+                {"batch_id": str(batch.run_id), "dry_run": self.dry_run},
+            )
 
-                # Wait for approval (handled by Slack integration)
-                # This is asynchronous - approval will trigger apply_changes separately
+            # Wait for approval (handled by Slack integration)
+            # This is asynchronous - approval will trigger apply_changes separately
+            # Note: In dry run mode, approval won't actually execute changes
 
             await self._log_event(EventType.RUN_COMPLETE, {"status": "success"})
             self.logger.info("agent_run_completed", recommendation_count=len(recommendations))
