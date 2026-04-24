@@ -104,31 +104,38 @@ Legacy SQ:
 
 ## Next Steps (In Order)
 
-### 1. SECURITY: Add API Authentication (MUST FIX BEFORE DRY_RUN=false)
-Cloud Run is publicly accessible with no auth on non-Slack endpoints. Anyone can trigger
-agent runs, toggle the kill switch, or force-reject approvals. Safe while DRY_RUN=true
-but MUST be fixed before production.
+### 1. ✅ SECURITY: API Authentication DEPLOYED
+**Status**: Implemented and tested (2026-04-24)
 
-**What to implement:**
-- Add auth middleware to FastAPI that validates requests on all non-Slack endpoints
-- Remove `allUsers` IAM binding from Cloud Run (`terraform/modules/cloud_run/main.tf` line 63-70)
-- Accept Cloud Scheduler OIDC tokens (for scheduled runs)
-- Accept API key header (for manual triggers) - store key in Secret Manager
-- Slack endpoints already have signature verification (no changes needed)
-- Add per-user authorization whitelist for Slack approval callbacks
+All non-Slack endpoints now require authentication:
+- ✅ Auth middleware validates X-API-Key header or OIDC tokens
+- ✅ API key stored in Secret Manager (`api-auth-key`)
+- ✅ Cloud Run mounts secret as `API_AUTH_KEY` env var
+- ✅ Slack endpoints use signature verification (unchanged)
+- ✅ Slack approval whitelist implemented (`SLACK_APPROVAL_USER_WHITELIST`)
+- ⚠️ Cloud Run still has `allUsers` IAM binding (safe because middleware blocks at app layer)
 
-**Files to modify:**
-- `src/api/middleware.py` (NEW) - Auth middleware
-- `src/main.py` - Register middleware
-- `terraform/modules/cloud_run/main.tf` - Remove allUsers binding
-- `terraform/modules/secrets/main.tf` - Add API key secret
-- `src/integrations/slack/app.py` - Add approval user whitelist
+**Testing Confirmed**:
+- Unauthenticated request → 401 "Authentication required"
+- Authenticated request → 200 OK (agent ran, 5,901 recommendations)
+- Public endpoints (`/health`) work without auth
+
+**Files Modified** (commit 0496de6):
+- `src/api/middleware.py` (NEW) - AuthMiddleware
+- `src/main.py` - Registered middleware
+- `src/integrations/slack/app.py` - Added approval user whitelist
+
+**Manual Deployment** (Cloud Run secret mount):
+- Secret `api-auth-key` created with 64-char hex key
+- Mounted to Cloud Run as `API_AUTH_KEY` environment variable
+
+See `SECURITY_GUIDE.md` for complete details.
 
 ### 2. Review Recommendations in Slack
-Check Slack channel `C0AC1TGCZA6` for agent recommendations. Running in DRY_RUN mode.
+Check Slack channel `C0AC1TGCZA6` for agent recommendations (5,901 generated). Running in DRY_RUN mode.
 
 ### 3. Conversion Goals via Google Ads Labels
-Apply labels in Google Ads UI (e.g., `conversion_goal:sc_org_create`) and have the agent
+Apply labels in Google Ads UI (e.g., `conversion_goal:sqc_org_create`) and have the agent
 read them from BigQuery. More maintainable than SQL scripts.
 
 ### 4. Fix Minor Issues
@@ -143,9 +150,10 @@ read them from BigQuery. More maintainable than SQL scripts.
 - Phase 4: Ad Copy Agent (RSA generation)
 - Phase 5: Bid Modifier Agent (device/location/time adjustments)
 
-### 7. Production Readiness (Only After Step 1 is Complete)
-- Verify auth middleware blocks unauthenticated requests
-- Set `DRY_RUN=false` after recommendation review
+### 7. Production Readiness (Security Complete ✅)
+- ✅ Auth middleware blocks unauthenticated requests
+- Review recommendations in Slack before enabling apply
+- Set `DRY_RUN=false` after recommendation approval
 - Configure Cloud Scheduler for daily automated runs
 - Validate Slack approval flow end-to-end
 
