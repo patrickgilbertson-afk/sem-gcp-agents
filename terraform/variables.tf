@@ -18,7 +18,7 @@ variable "dataset_agents" {
 variable "dataset_raw" {
   description = "BigQuery dataset for raw Google Ads data"
   type        = string
-  default     = "sem_ads_raw"
+  default     = "raw_google_ads"
 }
 
 variable "service_name" {
