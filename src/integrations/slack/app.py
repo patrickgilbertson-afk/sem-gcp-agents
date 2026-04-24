@@ -15,6 +15,33 @@ slack_app = AsyncApp(
 )
 
 
+def is_user_authorized(user_id: str) -> bool:
+    """Check if user is authorized to approve/reject recommendations.
+
+    Args:
+        user_id: Slack user ID
+
+    Returns:
+        True if user is authorized (in whitelist or whitelist is empty)
+    """
+    whitelist = settings.slack_approval_user_whitelist.strip()
+    if not whitelist:
+        # Empty whitelist = allow all users
+        return True
+
+    allowed_users = [u.strip() for u in whitelist.split(",") if u.strip()]
+    is_allowed = user_id in allowed_users
+
+    logger.info(
+        "user_authorization_check",
+        user_id=user_id,
+        is_authorized=is_allowed,
+        whitelist_size=len(allowed_users),
+    )
+
+    return is_allowed
+
+
 async def request_approval(batch: RecommendationBatch) -> None:
     """Send approval request to Slack channel.
 
@@ -208,6 +235,21 @@ async def handle_approve_all(ack, body, client):
     run_id = body["actions"][0]["value"]
     user_id = body["user"]["id"]
 
+    # Check user authorization
+    if not is_user_authorized(user_id):
+        logger.warning(
+            "unauthorized_approval_attempt",
+            run_id=run_id,
+            user_id=user_id,
+            action="approve_all",
+        )
+        await client.chat_postEphemeral(
+            channel=body["channel"]["id"],
+            user=user_id,
+            text=f"❌ You are not authorized to approve recommendations. Contact your administrator.",
+        )
+        return
+
     logger.info("approval_received", run_id=run_id, user_id=user_id, action="approve_all")
 
     # Update message to show approval in progress
@@ -399,6 +441,21 @@ async def handle_reject_all(ack, body, client):
     run_id = body["actions"][0]["value"]
     user_id = body["user"]["id"]
 
+    # Check user authorization
+    if not is_user_authorized(user_id):
+        logger.warning(
+            "unauthorized_rejection_attempt",
+            run_id=run_id,
+            user_id=user_id,
+            action="reject_all",
+        )
+        await client.chat_postEphemeral(
+            channel=body["channel"]["id"],
+            user=user_id,
+            text=f"❌ You are not authorized to reject recommendations. Contact your administrator.",
+        )
+        return
+
     logger.info("rejection_received", run_id=run_id, user_id=user_id, action="reject_all")
 
     # Update message to show rejection
@@ -431,6 +488,21 @@ async def handle_defer(ack, body, client):
 
     run_id = body["actions"][0]["value"]
     user_id = body["user"]["id"]
+
+    # Check user authorization
+    if not is_user_authorized(user_id):
+        logger.warning(
+            "unauthorized_defer_attempt",
+            run_id=run_id,
+            user_id=user_id,
+            action="defer",
+        )
+        await client.chat_postEphemeral(
+            channel=body["channel"]["id"],
+            user=user_id,
+            text=f"❌ You are not authorized to defer recommendations. Contact your administrator.",
+        )
+        return
 
     logger.info("deferral_received", run_id=run_id, user_id=user_id, action="defer")
 

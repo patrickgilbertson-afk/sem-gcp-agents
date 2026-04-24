@@ -60,7 +60,11 @@ resource "google_cloud_run_v2_service" "agent_service" {
   }
 }
 
-# Allow unauthenticated access (protected by Slack signing secret)
+# Allow unauthenticated access for Slack webhooks
+# Note: Security is enforced via middleware in the application:
+# - Slack endpoints: Signature verification (slack-bolt framework)
+# - Agent endpoints: API key or OIDC token (AuthMiddleware)
+# - Public endpoints: /health, / (intentionally public for monitoring)
 resource "google_cloud_run_v2_service_iam_member" "public_access" {
   name     = google_cloud_run_v2_service.agent_service.name
   location = google_cloud_run_v2_service.agent_service.location
@@ -68,3 +72,6 @@ resource "google_cloud_run_v2_service_iam_member" "public_access" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+# Alternative: Use Cloud Armor / API Gateway to restrict by IP + enforce auth at GCP level
+# For production, consider: https://cloud.google.com/armor/docs/cloud-armor-overview

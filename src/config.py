@@ -44,6 +44,7 @@ class Settings(BaseSettings):
 
     # Slack - Channel ID only (secrets loaded from Secret Manager)
     slack_approval_channel_id: str
+    slack_approval_user_whitelist: str = ""  # Comma-separated Slack user IDs (empty = allow all)
 
     # =========================================================================
     # Secrets - Loaded from GCP Secret Manager
@@ -142,6 +143,21 @@ class Settings(BaseSettings):
             return self._load_secret_with_fallback(
                 "GOOGLE_AI_API_KEY",
                 lambda sm: sm.get_secret("google-ai-api-key"),
+            )
+        except Exception:
+            return None
+
+    @cached_property
+    def api_auth_key(self) -> str | None:
+        """Load API authentication key from Secret Manager (optional).
+
+        Used for authenticating manual API calls to protected endpoints.
+        If not set, only OIDC tokens (Cloud Scheduler) can access protected endpoints.
+        """
+        try:
+            return self._load_secret_with_fallback(
+                "API_AUTH_KEY",
+                lambda sm: sm.get_secret("api-auth-key"),
             )
         except Exception:
             return None

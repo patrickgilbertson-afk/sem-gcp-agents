@@ -51,6 +51,7 @@ variable "secrets" {
     "slack-bot-token"             = ""
     "slack-signing-secret"        = ""
     "google-ai-api-key"           = ""
+    "api-auth-key"                = ""  # For authenticating manual API calls
   }
 }
 

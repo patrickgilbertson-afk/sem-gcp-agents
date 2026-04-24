@@ -38,6 +38,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Add authentication middleware
+from src.api.middleware import AuthMiddleware
+
+app.add_middleware(AuthMiddleware, api_key=settings.api_auth_key)
+
 
 @app.get("/health")
 async def health_check():
