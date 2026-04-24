@@ -102,18 +102,52 @@ class CampaignHealthAgent(BaseAgent):
 
         self.logger.info("gathered_health_data", campaign_count=len(health_data))
 
-        # Load taxonomy data for campaigns
+        # Load taxonomy data for campaigns (auto-populate if missing)
         from src.services.taxonomy import TaxonomyService
+        from src.utils.taxonomy import parse_campaign_name
 
         taxonomy_service = TaxonomyService(bq_client=self.bq_client)
         taxonomy_map = {}
         sync_group_map = {}
 
+        # Build campaign name lookup for auto-population
+        campaign_name_map = {}
+        for d in health_data:
+            campaign_name_map[d.campaign_id] = d.campaign_name
+
         # Get unique campaign IDs
         campaign_ids = list(set(d.campaign_id for d in health_data))
+        campaigns_seeded = 0
 
         for campaign_id in campaign_ids:
             taxonomy = await taxonomy_service.get_by_campaign_id(campaign_id)
+
+            # Auto-populate taxonomy if missing
+            if not taxonomy and campaign_id in campaign_name_map:
+                campaign_name = campaign_name_map[campaign_id]
+                self.logger.info(
+                    "auto_populating_taxonomy",
+                    campaign_id=campaign_id,
+                    campaign_name=campaign_name,
+                )
+                try:
+                    taxonomy = parse_campaign_name(
+                        campaign_id=campaign_id,
+                        campaign_name=campaign_name,
+                        customer_id=settings.google_ads_customer_id,
+                        campaign_status="ENABLED",
+                    )
+                    await taxonomy_service.upsert_taxonomy(taxonomy)
+                    campaigns_seeded += 1
+                except Exception as e:
+                    self.logger.warning(
+                        "taxonomy_auto_populate_failed",
+                        campaign_id=campaign_id,
+                        campaign_name=campaign_name,
+                        error=str(e),
+                    )
+                    taxonomy = None
+
             if taxonomy:
                 taxonomy_map[campaign_id] = taxonomy
 
@@ -129,6 +163,7 @@ class CampaignHealthAgent(BaseAgent):
         self.logger.info(
             "taxonomy_loaded",
             campaigns_with_taxonomy=len(taxonomy_map),
+            campaigns_seeded=campaigns_seeded,
             sync_groups=len(sync_group_map),
         )
 

@@ -19,31 +19,36 @@ from src.utils.taxonomy import parse_campaign_name, validate_taxonomy
 logger = structlog.get_logger(__name__)
 
 
-async def fetch_campaigns_from_google_ads(customer_id: str) -> list[dict]:
-    """Fetch all campaigns from Google Ads.
+async def fetch_campaigns_from_bigquery(customer_id: str) -> list[dict]:
+    """Fetch all campaigns from BigQuery raw Google Ads data.
 
     Args:
-        customer_id: Google Ads customer ID
+        customer_id: Google Ads customer ID (used as table suffix)
 
     Returns:
         List of campaign dictionaries with id, name, status
     """
-    # TODO: Implement actual Google Ads API call
-    # For now, return mock data for testing
-    logger.warning(
-        "using_mock_data",
-        message="Google Ads API integration not yet implemented, using mock data",
-    )
+    from src.integrations.bigquery.client import get_client as get_bq_client
 
-    return [
-        {"id": "123456", "name": "Brand_US", "status": "ENABLED"},
-        {"id": "123457", "name": "Brand_UK", "status": "ENABLED"},
-        {"id": "123458", "name": "Brand_DE", "status": "ENABLED"},
-        {"id": "234567", "name": "NonBrand_AI-Code_US", "status": "ENABLED"},
-        {"id": "234568", "name": "NonBrand_AI-Code_UK", "status": "ENABLED"},
-        {"id": "234569", "name": "NonBrand_LLM-Integration_US", "status": "ENABLED"},
-        {"id": "345678", "name": "Competitor_GitHub_US", "status": "ENABLED"},
+    bq_client = get_bq_client()
+    query = f"""
+        SELECT DISTINCT
+            campaign_id AS id,
+            campaign_name AS name,
+            campaign_status AS status
+        FROM `{settings.gcp_project_id}.{settings.bq_dataset_raw}.ads_Campaign_{customer_id}`
+        WHERE campaign_status = 'ENABLED'
+        ORDER BY campaign_name
+    """
+
+    logger.info("querying_bigquery_for_campaigns", customer_id=customer_id)
+    result = bq_client.query(query).result()
+    campaigns = [
+        {"id": str(row.id), "name": row.name, "status": row.status}
+        for row in result
     ]
+    logger.info("campaigns_fetched_from_bigquery", count=len(campaigns))
+    return campaigns
 
 
 async def seed_taxonomy(
@@ -74,9 +79,9 @@ async def seed_taxonomy(
     if brand_manager is None:
         brand_manager = "brand_vendor"
 
-    # Fetch campaigns
-    logger.info("fetching_campaigns_from_google_ads")
-    campaigns = await fetch_campaigns_from_google_ads(customer_id)
+    # Fetch campaigns from BigQuery
+    logger.info("fetching_campaigns_from_bigquery")
+    campaigns = await fetch_campaigns_from_bigquery(customer_id)
     logger.info("campaigns_fetched", count=len(campaigns))
 
     if not campaigns:
