@@ -659,6 +659,16 @@ resource "google_bigquery_table" "campaign_taxonomy" {
       mode = "NULLABLE"
     },
     {
+      name = "conversion_goal"
+      type = "STRING"
+      mode = "NULLABLE"
+    },
+    {
+      name = "conversion_source"
+      type = "STRING"
+      mode = "NULLABLE"
+    },
+    {
       name = "created_at"
       type = "TIMESTAMP"
       mode = "REQUIRED"

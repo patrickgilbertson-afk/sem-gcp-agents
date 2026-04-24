@@ -48,6 +48,8 @@ class CampaignTaxonomy(BaseModel):
     campaign_status: str | None = None
     agent_exclusions: list[str] = Field(default_factory=list)  # AgentType values to skip
     external_manager: str | None = None  # Who manages excluded scope
+    conversion_goal: str | None = None  # e.g., "SQC Org Creates", "Enterprise Lead"
+    conversion_source: str | None = None  # "google_analytics" or "salesforce"
     created_at: datetime
     updated_at: datetime
     updated_by: str | None = None

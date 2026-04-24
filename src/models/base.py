@@ -47,4 +47,5 @@ class EventType(str, Enum):
     APPROVAL_RECEIVED = "approval_received"
     APPLY_CHANGES = "apply_changes"
     DELEGATION = "delegation"
+    GUARDRAIL_BLOCKED = "guardrail_blocked"
     ERROR = "error"

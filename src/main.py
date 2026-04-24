@@ -76,11 +76,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # Import and include routers
-from src.api import orchestrator, agents, slack
+from src.api import orchestrator, agents, slack, approvals, reports
 
 app.include_router(orchestrator.router, prefix="/api/v1/orchestrator", tags=["orchestrator"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(slack.router, prefix="/api/v1/slack", tags=["slack"])
+app.include_router(approvals.router, prefix="/api/v1/approvals", tags=["approvals"])
+app.include_router(reports.router, prefix="/api/v1/reports", tags=["reports"])
 
 
 if __name__ == "__main__":

@@ -23,6 +23,9 @@ class BaseAgent(ABC):
     Each step writes to the agent_audit_log in BigQuery.
     """
 
+    # Subclasses override to specify which actions can propagate to sync groups
+    PROPAGATABLE_ACTIONS: set[str] = set()
+
     def __init__(self, agent_type: AgentType, run_id: UUID | None = None) -> None:
         """Initialize base agent.
 
@@ -173,6 +176,28 @@ class BaseAgent(ABC):
             {"recommendation_count": len(recommendations)},
         )
 
+        # Pre-flight guardrail validation
+        from src.core.guardrails import GuardrailService
+
+        guardrails = GuardrailService()
+        is_safe, violations = await guardrails.validate_before_apply(
+            recommendations=recommendations,
+            agent_type=self.agent_type,
+        )
+
+        if not is_safe:
+            await self._log_event(
+                EventType.GUARDRAIL_BLOCKED,
+                {"violations": [v.to_dict() for v in violations]},
+            )
+            return {
+                "total": len(recommendations),
+                "succeeded": 0,
+                "failed": 0,
+                "blocked": True,
+                "violations": [v.to_dict() for v in violations],
+            }
+
         results = {
             "total": len(recommendations),
             "succeeded": 0,
@@ -213,6 +238,71 @@ class BaseAgent(ABC):
             recommendation: Recommendation to apply
         """
         pass
+
+    async def propagate_to_sync_group(
+        self,
+        rec: Recommendation,
+        sync_group_context: Any,  # SyncGroupContext from taxonomy module
+    ) -> list[Recommendation]:
+        """Clone a recommendation for all campaigns in a sync group.
+
+        Uses SyncGroupResolver to find equivalent entities by name across geos.
+        E.g., pausing ad group "broad_generic_terms" in US → finds and pauses
+        the same-named ad group in UK, DE, FR.
+
+        Args:
+            rec: Source recommendation to propagate
+            sync_group_context: Context with all campaigns in sync group
+
+        Returns:
+            List of cloned recommendations for other campaigns
+        """
+        # Only propagate if action type is in PROPAGATABLE_ACTIONS
+        if rec.action_type not in self.PROPAGATABLE_ACTIONS:
+            self.logger.info(
+                "action_not_propagatable",
+                action_type=rec.action_type,
+                propagatable_actions=list(self.PROPAGATABLE_ACTIONS),
+            )
+            return []
+
+        from src.services.sync_group_resolver import SyncGroupResolver
+        from src.integrations.bigquery.client import get_client
+
+        resolver = SyncGroupResolver(bq_client=get_client())
+
+        # Resolve entities across all campaigns in sync group
+        resolved_params = await resolver.resolve_entities_for_sync_group(
+            action_params=rec.action_params,
+            source_campaign_id=rec.action_params["campaign_id"],
+            sync_group_context=sync_group_context,
+        )
+
+        # Create cloned recommendations
+        propagated = []
+        for target_params in resolved_params:
+            if target_params["campaign_id"] == rec.action_params["campaign_id"]:
+                continue  # Skip source campaign
+
+            clone = rec.model_copy(update={
+                "id": uuid4(),
+                "action_params": target_params,
+                "metadata": {
+                    **rec.metadata,
+                    "propagated_from": str(rec.id),
+                    "geo": target_params.get("geo"),
+                },
+            })
+            propagated.append(clone)
+
+        self.logger.info(
+            "recommendation_propagated",
+            source_rec_id=str(rec.id),
+            sync_group=sync_group_context.sync_group,
+            propagated_count=len(propagated),
+        )
+
+        return propagated
 
     async def _save_recommendations(self, recommendations: list[Recommendation]) -> None:
         """Save recommendations to BigQuery.
@@ -283,6 +373,29 @@ class BaseAgent(ABC):
             agent_type=self.agent_type,
             event_type=event_type,
             details=details or {},
+        )
+
+    async def _load_knowledge_context(
+        self,
+        campaign_type: str | None = None,
+        conversion_goal: str | None = None,
+    ) -> str:
+        """Load knowledge context for this agent.
+
+        Args:
+            campaign_type: Optional campaign type (e.g., "brand", "non_brand")
+            conversion_goal: Optional conversion goal (e.g., "sqc_org_creates")
+
+        Returns:
+            Formatted knowledge context string
+        """
+        from src.services.knowledge import KnowledgeService
+
+        svc = KnowledgeService()
+        return svc.get_context(
+            agent_type=self.agent_type.value,
+            campaign_type=campaign_type,
+            conversion_goal=conversion_goal,
         )
 
     def _summarize_data(self, data: dict[str, Any]) -> dict[str, Any]:

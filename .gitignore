@@ -29,6 +29,11 @@ htmlcov/
 .env.local
 *.local
 
+# Credentials (NEVER commit service account keys!)
+.credentials/
+*-key.json
+*.json
+
 # Terraform
 terraform/.terraform/
 terraform/*.tfstate
