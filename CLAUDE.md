@@ -1,5 +1,53 @@
 # SEM GCP Agents - Project Context
 
+## 🚨 CRITICAL CONTEXT (Read First!)
+
+**Current Phase**: Phase 2.5 Complete - Ready for Cloud Run Testing
+**Last Updated**: 2026-04-24
+**Status**: Code committed & pushed to GitHub, deploying to Cloud Run
+
+### Key Facts to Remember
+
+1. **Data Source Architecture** (CRITICAL - Often Confused)
+   - ✅ Agents READ from BigQuery (NOT Google Ads API)
+   - ✅ Campaign data: `raw_google_ads.ads_Campaign_9624230998`
+   - ✅ GA4 data: `analytics_272839261.events_*`
+   - ❌ Google Ads API ONLY used for WRITING changes (apply_changes)
+
+2. **Secret Management** (Changed Recently)
+   - ✅ ALL secrets in GCP Secret Manager
+   - ✅ `.env` file has ZERO secrets (only non-sensitive config)
+   - ✅ `src/config.py` loads secrets via `@cached_property`
+   - ❌ DO NOT create scripts to load secrets into `.env`
+
+3. **Account Structure**
+   - MCC Account: `1109417913` (for API authentication)
+   - Campaign Account: `9624230998` (where ads actually run)
+   - Both IDs needed - we use Manager Account structure
+
+4. **Current Configuration**
+   - Project: `marketing-bigquery-490714`
+   - GA4: `analytics_272839261` (~508k events/day, safe)
+   - Slack: `C0AC1TGCZA6`
+   - Mode: DRY_RUN=true (safe)
+
+5. **Next Immediate Step**
+   - Wait for Cloud Run deployment
+   - Trigger Campaign Health Agent
+   - Agent will populate empty `campaign_taxonomy` table
+   - Then run `sql/populate_conversion_goals.sql`
+
+### What Just Got Committed (960e913)
+
+Phase 2.5 implementation (41 files, 6,973 lines):
+- Guardrails, knowledge system, sync groups
+- Conversion goals, weekly reporting, GA4 integration
+- Secret Manager migration
+
+See `PROJECT_CONTEXT.md` for complete current state snapshot.
+
+---
+
 ## Overview
 
 This is an AI-powered SEM campaign management framework running on Google Cloud Platform. The system uses specialized AI agents to automate campaign health monitoring, keyword management, ad copy generation, and bid optimization.
