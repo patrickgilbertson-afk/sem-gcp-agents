@@ -12,6 +12,7 @@ class CampaignType(str, Enum):
     BRAND = "brand"
     NON_BRAND = "non_brand"
     COMPETITOR = "competitor"
+    ENTERPRISE = "enterprise"
     DYNAMIC = "dynamic"
     SHOPPING = "shopping"
 
