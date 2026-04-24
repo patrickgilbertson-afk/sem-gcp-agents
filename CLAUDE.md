@@ -37,12 +37,11 @@
    - Also handles legacy `SQ {Region} - {Type} - {Suffix}` format
    - DO NOT use old placeholder patterns (Brand_US, NonBrand_AI-Code_US)
 
-6. **Next Steps**
-   - Implement conversion goals via Google Ads labels (not SQL scripts)
-   - Review 5,886 recommendations in Slack channel C0AC1TGCZA6
-   - Fix `llm_call_log` missing `error_code` column
-   - Fill knowledge base (optional)
-   - Build Phase 3+ agents
+6. **Next Steps** (PRIORITY ORDER)
+   - SECURITY FIRST: Add API auth middleware, remove allUsers IAM binding
+   - DO NOT set DRY_RUN=false until auth is implemented
+   - Then: conversion goals via Google Ads labels, review Slack recs
+   - Then: fix `llm_call_log`, fill knowledge base, build Phase 3+ agents
 
 7. **Corporate Network Limitation**
    - SSL cert issues prevent local Secret Manager access

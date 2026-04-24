@@ -104,25 +104,47 @@ Legacy SQ:
 
 ## Next Steps (In Order)
 
-### 1. Conversion Goals via Google Ads Labels (PLANNED)
-Instead of SQL scripts, apply labels in Google Ads UI (e.g., `conversion_goal:sc_org_create`) and have the agent read them from BigQuery. More maintainable than SQL scripts.
+### 1. SECURITY: Add API Authentication (MUST FIX BEFORE DRY_RUN=false)
+Cloud Run is publicly accessible with no auth on non-Slack endpoints. Anyone can trigger
+agent runs, toggle the kill switch, or force-reject approvals. Safe while DRY_RUN=true
+but MUST be fixed before production.
+
+**What to implement:**
+- Add auth middleware to FastAPI that validates requests on all non-Slack endpoints
+- Remove `allUsers` IAM binding from Cloud Run (`terraform/modules/cloud_run/main.tf` line 63-70)
+- Accept Cloud Scheduler OIDC tokens (for scheduled runs)
+- Accept API key header (for manual triggers) - store key in Secret Manager
+- Slack endpoints already have signature verification (no changes needed)
+- Add per-user authorization whitelist for Slack approval callbacks
+
+**Files to modify:**
+- `src/api/middleware.py` (NEW) - Auth middleware
+- `src/main.py` - Register middleware
+- `terraform/modules/cloud_run/main.tf` - Remove allUsers binding
+- `terraform/modules/secrets/main.tf` - Add API key secret
+- `src/integrations/slack/app.py` - Add approval user whitelist
 
 ### 2. Review Recommendations in Slack
 Check Slack channel `C0AC1TGCZA6` for agent recommendations. Running in DRY_RUN mode.
 
-### 3. Fix Minor Issues
+### 3. Conversion Goals via Google Ads Labels
+Apply labels in Google Ads UI (e.g., `conversion_goal:sc_org_create`) and have the agent
+read them from BigQuery. More maintainable than SQL scripts.
+
+### 4. Fix Minor Issues
 - Add `error_code` column to `llm_call_log` table
 - Clean up SQ legacy geo names
 
-### 4. Fill Knowledge Base (Optional)
+### 5. Fill Knowledge Base (Optional)
 `docs/knowledge/*.md` files need real company data for better recommendations.
 
-### 5. Phase 3+: More Agents
+### 6. Phase 3+: More Agents
 - Phase 3: Keyword Agent (search term analysis, negative keywords)
 - Phase 4: Ad Copy Agent (RSA generation)
 - Phase 5: Bid Modifier Agent (device/location/time adjustments)
 
-### 6. Production Readiness
+### 7. Production Readiness (Only After Step 1 is Complete)
+- Verify auth middleware blocks unauthenticated requests
 - Set `DRY_RUN=false` after recommendation review
 - Configure Cloud Scheduler for daily automated runs
 - Validate Slack approval flow end-to-end
